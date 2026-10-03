@@ -105,12 +105,25 @@ html[dir="rtl"] .sidebar {
   height: 18px;
   border-radius: 0 2px 2px 0;
   background-color: var(--color-primary);
+  transform-origin: center;
+  animation: nav-indicator-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes nav-indicator-enter {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
 }
 
 html[dir="rtl"] .nav-item.active::before {
   left: auto;
   right: 0;
   border-radius: 2px 0 0 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-item.active::before {
+    animation: none;
+  }
 }
 
 .nav-icon {

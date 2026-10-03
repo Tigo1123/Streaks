@@ -2467,6 +2467,111 @@ html[dir="rtl"] .landing-page .welcome-hero-headline {
   color: var(--text-secondary);
 }
 
+/* --------------------------------------------------------------------------
+   Phase 6 · Batch 7: restrained, staggered interface motion
+   -------------------------------------------------------------------------- */
+.momentum-hero-card,
+.today-panel,
+.detail-hero-card,
+.detail-metrics-card,
+.detail-section-card,
+.landing-preview,
+.landing-feature-card,
+.empty-dashboard {
+  animation: phase7-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.momentum-hero-card,
+.detail-hero-card,
+.landing-preview,
+.empty-dashboard {
+  animation-delay: 0ms;
+}
+
+.today-panel,
+.detail-metrics-card,
+.landing-feature-card:nth-child(1) {
+  animation-delay: 60ms;
+}
+
+.detail-section-card:nth-of-type(2),
+.landing-feature-card:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.detail-section-card:nth-of-type(3),
+.landing-feature-card:nth-child(3) {
+  animation-delay: 180ms;
+}
+
+.challenge-card {
+  animation: phase7-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.challenge-card:nth-child(2) { animation-delay: 50ms; }
+.challenge-card:nth-child(3) { animation-delay: 100ms; }
+.challenge-card:nth-child(4) { animation-delay: 150ms; }
+.challenge-card:nth-child(5) { animation-delay: 200ms; }
+.challenge-card:nth-child(6) { animation-delay: 250ms; }
+
+.today-item {
+  animation: phase7-enter 360ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.today-item:nth-child(2) { animation-delay: 45ms; }
+.today-item:nth-child(3) { animation-delay: 90ms; }
+.today-item:nth-child(4) { animation-delay: 135ms; }
+.today-item:nth-child(5) { animation-delay: 180ms; }
+
+.progress-ring-inner {
+  animation: phase7-ring-fill 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.week-bar-fill {
+  transform: scaleY(0);
+  transform-origin: center bottom;
+  animation: phase7-bar-grow 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.week-bar-column:nth-child(2) .week-bar-fill { animation-delay: 35ms; }
+.week-bar-column:nth-child(3) .week-bar-fill { animation-delay: 70ms; }
+.week-bar-column:nth-child(4) .week-bar-fill { animation-delay: 105ms; }
+.week-bar-column:nth-child(5) .week-bar-fill { animation-delay: 140ms; }
+.week-bar-column:nth-child(6) .week-bar-fill { animation-delay: 175ms; }
+.week-bar-column:nth-child(7) .week-bar-fill { animation-delay: 210ms; }
+
+.landing-login-link,
+.landing-page .welcome-main-cta,
+.detail-back-pill,
+.detail-delete-btn,
+.day-cell {
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+@keyframes phase7-enter {
+  from {
+    opacity: 0.88;
+    translate: 0 6px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes phase7-ring-fill {
+  from { stroke-dashoffset: var(--progress-ring-circumference); }
+  to { stroke-dashoffset: var(--progress-ring-offset); }
+}
+
+@keyframes phase7-bar-grow {
+  to { transform: scaleY(1); }
+}
+
 @media (max-width: 760px) {
   .landing-hero {
     grid-template-columns: 1fr;
@@ -2512,5 +2617,27 @@ html[dir="rtl"] .landing-page .welcome-hero-headline {
 
   .landing-page .welcome-main-cta {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .momentum-hero-card,
+  .today-panel,
+  .detail-hero-card,
+  .detail-metrics-card,
+  .detail-section-card,
+  .landing-preview,
+  .landing-feature-card,
+  .empty-dashboard,
+  .challenge-card,
+  .today-item,
+  .progress-ring-inner,
+  .week-bar-fill {
+    animation: none;
+    translate: none;
+  }
+
+  .week-bar-fill {
+    transform: none;
   }
 }

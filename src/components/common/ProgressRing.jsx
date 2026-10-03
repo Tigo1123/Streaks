@@ -12,7 +12,12 @@ export function ProgressRing({ value = 0, label, size = 88, className = "" }) {
       className={`progress-ring ${className}`.trim()}
       role="img"
       aria-label={`${label}: ${percentage}%`}
-      style={{ width: `${size}px`, height: `${size}px` }}
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        "--progress-ring-circumference": circumference,
+        "--progress-ring-offset": offset
+      }}
     >
       <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
         <defs>

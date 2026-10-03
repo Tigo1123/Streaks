@@ -302,3 +302,18 @@ test("Phase 6 - Auth modal provides localized password visibility and pending st
     assert.equal(typeof ar[key], "string", `Arabic auth translation exists for ${key}`);
   }
 });
+
+test("Phase 6 - Motion stays brief, staggered, and respects reduced-motion preferences", () => {
+  const styles = fs.readFileSync(path.join(projectRoot, "src/styles/components.css"), "utf8");
+  const layoutStyles = fs.readFileSync(path.join(projectRoot, "src/styles/layout.css"), "utf8");
+  const ring = fs.readFileSync(path.join(projectRoot, "src/components/common/ProgressRing.jsx"), "utf8");
+
+  assert.ok(styles.includes("@keyframes phase7-enter"), "Cards have a short entrance animation");
+  assert.ok(styles.includes("@keyframes phase7-ring-fill"), "Progress ring supports stroke drawing");
+  assert.ok(ring.includes('"--progress-ring-circumference"'), "Ring animation uses its actual SVG circumference");
+  assert.ok(styles.includes("@keyframes phase7-bar-grow"), "Weekly bars grow from their baseline");
+  assert.ok(styles.includes(".challenge-card:nth-child(6) { animation-delay: 250ms; }"), "Dashboard cards use a light stagger");
+  assert.ok(styles.includes("@media (prefers-reduced-motion: reduce)"), "Motion is disabled for reduced-motion users");
+  assert.ok(layoutStyles.includes("@keyframes nav-indicator-enter"), "Sidebar active indicator animates on change");
+  assert.ok(layoutStyles.includes("@media (prefers-reduced-motion: reduce)"), "Sidebar animation respects reduced motion");
+});
