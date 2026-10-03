@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Streaks">
-<meta name="streaks-api-base-url" content="">
+<meta name="streaks-api-base-url" content="https://streaks-api-7213.onrender.com">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <title>Streaks — small steps, kept daily</title>
@@ -43,7 +43,7 @@ const localFrontend=localHost||location.port==="8080"||location.protocol==="file
 const localApiUrl=new URL(location.protocol==="file:"?"http://localhost/":location.origin);
 localApiUrl.port="10000";
 const localApiBase=localApiUrl.origin;
-const API_BASE_URL=(configuredApiUrl||(localFrontend?localApiBase:location.origin)).replace(/\/+$/,"");
+const API_BASE_URL=(localFrontend?localApiBase:(configuredApiUrl||"https://streaks-api-7213.onrender.com")).replace(/\/+$/,"");
 let authState={status:"loading",token:null,user:null,noticeKey:null,formErrorKey:null},authView=null,authHistoryDepth=0,authSubmitting=false,authOperation=0,authEmailDraft="",migrationRunning=false,migrationProgress=null,migrationResultKey=null,migrationResultCounts=null,migrationResultReason="",migrationWasAttempted=false,migrationPreviewSnapshot=null,syncRunning=false,syncStatus="idle",syncLastSyncedAt=null,syncResultKey=null,syncResultCounts=null,syncConflicts=[],syncConflictIndex=0,syncDecisions={},syncPending=null,syncOperation=0,applyingSyncState=false,syncAbortController=null;
 const MIGRATION_KEY="streaks-cloud-migration-v1";
 const SYNC_META_KEY="streaks-cloud-sync-v1";
