@@ -6,6 +6,7 @@ import { TodayActionPanel } from "./TodayActionPanel.jsx";
 import { ChallengesGrid } from "./ChallengesGrid.jsx";
 import { WelcomeScreen } from "./WelcomeScreen.jsx";
 import { t } from "../../i18n/index.js";
+import { useNavigation } from "../../hooks/useNavigation.js";
 
 function getGreeting(language) {
   const hour = new Date().getHours();
@@ -21,12 +22,25 @@ function getGreeting(language) {
 
 export function DashboardView() {
   const { challenges, language } = useStreaks();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, status } = useAuth();
+  const { openModal } = useNavigation();
 
   const isRtl = language === "ar";
 
-  if (!isAuthenticated || challenges.length === 0) {
+  if (challenges.length === 0 && status === "unauthenticated") {
     return <WelcomeScreen />;
+  }
+
+  if (challenges.length === 0) {
+    return (
+      <section className="empty-dashboard" aria-labelledby="emptyDashboardTitle">
+        <h1 id="emptyDashboardTitle">{t("emptyTitle", {}, language)}</h1>
+        <p>{t("emptyText", {}, language)}</p>
+        <button type="button" className="btn btn-primary" onClick={() => openModal("create")}>
+          {t("create", {}, language)}
+        </button>
+      </section>
+    );
   }
 
   const baseGreeting = getGreeting(language);

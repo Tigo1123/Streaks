@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { dayIndex, localToday } from "../src/utils/date.js";
 import { progress, streakStats, status as getStatus, remaining } from "../src/utils/streakCalculations.js";
 import { validImportChallenge, createInitialState, VERSION } from "../src/services/storage.js";
+import { en } from "../src/i18n/en.js";
+import { ar } from "../src/i18n/ar.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -257,4 +259,27 @@ test("Phase 6 - Challenge detail renders weekly bars and retains calendar contro
   assert.ok(grid.includes('disabled={future}'), "Future calendar days remain non-interactive");
   assert.ok(styles.includes("grid-template-columns: repeat(7, minmax(0, 1fr));"), "Weekly chart has seven columns");
   assert.ok(styles.includes("min-width: 44px;"), "Calendar day controls retain minimum touch size");
+});
+
+test("Phase 6 - Landing is limited to new visitors and previews the app in both languages", () => {
+  const landing = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/WelcomeScreen.jsx"), "utf8");
+  const dashboard = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/DashboardView.jsx"), "utf8");
+
+  assert.ok(dashboard.includes('challenges.length === 0 && status === "unauthenticated"'), "Only unauthenticated visitors without local challenges see the landing");
+  assert.ok(landing.includes('<ProgressRing'), "Landing previews the shared progress ring");
+  assert.ok(landing.includes("<WeekBars"), "Landing previews the shared weekly chart");
+  assert.ok(landing.includes('openModal("create")'), "Primary CTA starts a local challenge without account creation");
+  assert.ok(landing.includes('openModal("auth")'), "Secondary CTA opens sign-in for sync");
+  for (const key of [
+    "welcomeLoginSync",
+    "welcomePreview",
+    "welcomePreviewLabel",
+    "welcomePreviewChallenge",
+    "welcomePreviewProgress",
+    "welcomePreviewDays",
+    "welcomeBenefits"
+  ]) {
+    assert.equal(typeof en[key], "string", `English landing translation exists for ${key}`);
+    assert.equal(typeof ar[key], "string", `Arabic landing translation exists for ${key}`);
+  }
 });

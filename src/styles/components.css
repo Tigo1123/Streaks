@@ -2231,3 +2231,286 @@ html[dir="rtl"] .dashboard-table {
     padding: var(--space-4);
   }
 }
+
+/* --------------------------------------------------------------------------
+   Phase 6 · Batch 5: first-visit landing
+   -------------------------------------------------------------------------- */
+.welcome-section.landing-page {
+  width: min(100%, 1120px);
+  max-width: 1120px;
+  margin: var(--space-8) auto;
+  align-items: stretch;
+  gap: clamp(24px, 4vw, 44px);
+  text-align: start;
+  animation: none;
+}
+
+.landing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.landing-page .welcome-brand-badge {
+  background: rgba(123, 92, 255, 0.14);
+  border-color: var(--border-card);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.landing-page .welcome-flame {
+  animation: none;
+}
+
+.landing-kicker {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: center;
+  gap: clamp(28px, 6vw, 72px);
+}
+
+.landing-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.landing-page .welcome-hero-headline {
+  max-width: 600px;
+  font-size: clamp(2.35rem, 5.5vw, 4.25rem);
+  letter-spacing: -0.035em;
+}
+
+html[dir="rtl"] .landing-page .welcome-hero-headline {
+  letter-spacing: 0;
+}
+
+.landing-page .welcome-hero-subline {
+  max-width: 34rem;
+}
+
+.landing-page .welcome-cta-group {
+  justify-content: flex-start;
+  margin: var(--space-2) 0 0;
+  gap: var(--space-4);
+}
+
+.landing-page .welcome-main-cta {
+  min-height: 52px;
+  padding-inline: var(--space-6);
+}
+
+.landing-login-link {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.landing-login-link:hover {
+  color: var(--text-primary);
+}
+
+.landing-preview,
+.landing-feature-card,
+.empty-dashboard {
+  border: 1px solid var(--border-card);
+  background:
+    linear-gradient(145deg, rgba(123, 92, 255, 0.1), rgba(59, 130, 246, 0.045)),
+    var(--bg-card);
+  border-radius: var(--radius-xl);
+}
+
+.landing-preview {
+  min-width: 0;
+  padding: clamp(20px, 3vw, 32px);
+}
+
+.landing-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.landing-preview-eyebrow {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.landing-preview-header h2 {
+  margin: var(--space-1) 0 0;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+}
+
+.landing-preview-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-preview-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-block: var(--space-5);
+  color: var(--text-primary);
+}
+
+.landing-preview-progress strong {
+  font-size: 1.05rem;
+}
+
+.landing-preview-progress p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+}
+
+.landing-preview-chart {
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border-card);
+}
+
+.landing-preview-chart .week-bars-columns {
+  min-height: 98px;
+}
+
+.landing-preview-chart .week-bar-visual {
+  min-height: 78px;
+}
+
+.landing-preview-chart .week-bar-track {
+  height: 56px;
+}
+
+.landing-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-feature-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 128px;
+  padding: var(--space-4);
+}
+
+.landing-feature-icon {
+  display: grid;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: rgba(123, 92, 255, 0.18);
+  color: #c4b5fd;
+  font-size: 1.2rem;
+}
+
+.landing-feature-card h2 {
+  margin: 0 0 var(--space-1);
+  color: var(--text-primary);
+  font-size: 0.98rem;
+}
+
+.landing-feature-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.landing-privacy-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.empty-dashboard {
+  width: min(100%, 620px);
+  margin: clamp(48px, 12vh, 120px) auto;
+  padding: clamp(24px, 5vw, 48px);
+  text-align: center;
+}
+
+.empty-dashboard h1 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.empty-dashboard p {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 760px) {
+  .landing-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-copy {
+    align-items: center;
+    text-align: center;
+  }
+
+  .landing-page .welcome-cta-group {
+    justify-content: center;
+  }
+
+  .landing-features {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-feature-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .welcome-section.landing-page {
+    margin-block: var(--space-5);
+    gap: var(--space-5);
+  }
+
+  .landing-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .landing-page .welcome-hero-headline {
+    font-size: clamp(2rem, 10vw, 2.7rem);
+  }
+
+  .landing-page .welcome-cta-group {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .landing-page .welcome-main-cta {
+    width: 100%;
+  }
+}
