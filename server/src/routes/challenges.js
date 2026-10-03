@@ -182,12 +182,11 @@ router.patch("/:id", async (req, res) => {
       values.push(value);
       assignments.push(`${field} = $${values.length}`);
     }
-    const versionClause = expectedUpdatedAt ? ` AND updated_at = $${values.push(expectedUpdatedAt)}` : "";
     const result = await client.query(
-      `UPDATE challenges SET ${assignments.join(", ")} WHERE id = $1 AND user_id = $2${versionClause} RETURNING ${challengeColumns}`,
+      `UPDATE challenges SET ${assignments.join(", ")} WHERE id = $1 AND user_id = $2 RETURNING ${challengeColumns}`,
       values
     );
-    if (!result.rowCount) throw new ApiError(409, "Challenge changed since it was read");
+    if (!result.rowCount) throw new ApiError(404, "Not found");
     return result.rows[0];
   });
   return res.json({ challenge: mapChallenge(updated) });

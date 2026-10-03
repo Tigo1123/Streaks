@@ -363,4 +363,92 @@ test("cloud data API integration and ownership (requires TEST_DATABASE_URL)", {
     assert.equal((await request(`/api/challenges/${challengeB.id}`, { method: "DELETE", token: tokenA })).status, 404);
     assert.equal((await request(`/api/challenges/${challengeB.id}`, { method: "DELETE", token: tokenB })).status, 204);
   });
+
+  await t.test("Phase 3C sync workflow: repeated idempotent sync, conflict handling, tombstones, and resurrecting deletions", async () => {
+    // 1. Create a challenge for User A
+    const resA = await request("/api/challenges", { method: "POST", token: tokenA, body: validChallenge("Sync Flow A") });
+    assert.equal(resA.status, 201);
+    const flowChallengeA = (await resA.json()).challenge;
+
+    // 2. Add note and completion
+    const noteRes = await request(`/api/challenges/${flowChallengeA.id}/notes`, {
+      method: "PUT", token: tokenA, body: { content: "Initial note" }, headers: { "if-none-match": "*" }
+    });
+    assert.equal(noteRes.status, 200);
+    const initialNoteVersion = (await noteRes.json()).note.updatedAt;
+
+    const compRes = await request(`/api/challenges/${flowChallengeA.id}/completions`, {
+      method: "POST", token: tokenA, body: { completionDate: today }
+    });
+    assert.equal(compRes.status, 201);
+
+    // 3. Repeated idempotent sync snapshot calls
+    const sync1 = await (await request("/api/sync", { token: tokenA })).json();
+    const sync2 = await (await request("/api/sync", { token: tokenA })).json();
+    assert.deepEqual(sync1, sync2, "Repeated /api/sync snapshots must be identical without mutations");
+    assert.equal(sync1.challenges.some((c) => c.id === flowChallengeA.id), true);
+    assert.equal(sync1.completions.some((c) => c.challengeId === flowChallengeA.id && c.completionDate === today), true);
+    assert.equal(sync1.notes.some((n) => n.challengeId === flowChallengeA.id && n.note.content === "Initial note"), true);
+
+    // 4. Stale If-Match conflict on note update
+    const staleNoteRes = await request(`/api/challenges/${flowChallengeA.id}/notes`, {
+      method: "PUT", token: tokenA, body: { content: "Updated note" }, headers: { "if-match": "2020-01-01T00:00:00.000Z" }
+    });
+    assert.equal(staleNoteRes.status, 409);
+
+    // Valid If-Match on note update succeeds
+    const updatedNoteRes = await request(`/api/challenges/${flowChallengeA.id}/notes`, {
+      method: "PUT", token: tokenA, body: { content: "Updated note" }, headers: { "if-match": initialNoteVersion }
+    });
+    assert.equal(updatedNoteRes.status, 200);
+    const updatedNoteVersion = (await updatedNoteRes.json()).note.updatedAt;
+
+    // Stale If-Match on note delete
+    assert.equal((await request(`/api/challenges/${flowChallengeA.id}/notes`, {
+      method: "DELETE", token: tokenA, headers: { "if-match": initialNoteVersion }
+    })).status, 409);
+
+    // 5. Completion deletion creates tombstone
+    const delComp = await request(`/api/challenges/${flowChallengeA.id}/completions/${today}`, {
+      method: "DELETE", token: tokenA
+    });
+    assert.equal(delComp.status, 204);
+
+    const syncAfterCompDelete = await (await request("/api/sync", { token: tokenA })).json();
+    assert.equal(syncAfterCompDelete.tombstones.some((entry) => entry.entityType === "completion" && entry.entityKey === `${flowChallengeA.id}|${today}`), true);
+
+    // Re-adding completion clears tombstone
+    const reAddComp = await request(`/api/challenges/${flowChallengeA.id}/completions`, {
+      method: "POST", token: tokenA, body: { completionDate: today }
+    });
+    assert.equal(reAddComp.status, 201);
+
+    const syncAfterReAdd = await (await request("/api/sync", { token: tokenA })).json();
+    assert.equal(syncAfterReAdd.tombstones.some((entry) => entry.entityType === "completion" && entry.entityKey === `${flowChallengeA.id}|${today}`), false);
+    assert.equal(syncAfterReAdd.completions.some((c) => c.challengeId === flowChallengeA.id && c.completionDate === today), true);
+
+    // 6. Challenge deletion with stale If-Match returns 409
+    assert.equal((await request(`/api/challenges/${flowChallengeA.id}`, {
+      method: "DELETE", token: tokenA, headers: { "if-match": "2020-01-01T00:00:00.000Z" }
+    })).status, 409);
+
+    // Valid delete returns 204 and creates tombstone
+    const latestChallenge = (await (await request(`/api/challenges/${flowChallengeA.id}`, { token: tokenA })).json()).challenge;
+    assert.equal((await request(`/api/challenges/${flowChallengeA.id}`, {
+      method: "DELETE", token: tokenA, headers: { "if-match": latestChallenge.updatedAt }
+    })).status, 204);
+
+    // Repeated delete on tombstoned challenge is idempotent 204
+    assert.equal((await request(`/api/challenges/${flowChallengeA.id}`, {
+      method: "DELETE", token: tokenA
+    })).status, 204);
+
+    const syncFinalA = await (await request("/api/sync", { token: tokenA })).json();
+    assert.equal(syncFinalA.tombstones.some((entry) => entry.entityType === "challenge" && entry.entityKey === flowChallengeA.id), true);
+
+    // 7. Cross-user isolation: User B sees none of User A's data or tombstones
+    const syncUserB = await (await request("/api/sync", { token: tokenB })).json();
+    assert.equal(syncUserB.challenges.some((c) => c.id === flowChallengeA.id), false);
+    assert.equal(syncUserB.tombstones.some((t) => t.entityKey.includes(flowChallengeA.id)), false);
+  });
 });
