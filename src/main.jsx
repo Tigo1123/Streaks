@@ -9,6 +9,12 @@ import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/modals.css";
 
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  navigator.serviceWorker
+    .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
+    .catch((error) => console.error("Service Worker registration failed:", error));
+}
+
 const rootElement = document.getElementById("root");
 
 if (rootElement) {
@@ -20,4 +26,3 @@ if (rootElement) {
     </React.StrictMode>
   );
 }
-

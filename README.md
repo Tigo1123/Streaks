@@ -4,14 +4,20 @@ A minimal, offline challenge tracker that stores your challenges in this browser
 
 ## Run
 
-Open `index.html` in a browser. No installation or build step is needed.
+Use Node.js 22 or newer, then run `npm install` and `npm run dev`. The Vite development server does not register the production Service Worker.
 
 ## Deploy on Render
 
-Create a **Static Site** using this repository.
+Create a **Static Site** using this repository with these settings:
 
-- Build Command: leave empty
-- Publish Directory: `.`
+- Build Command: `npm run build`
+- Publish Directory: `dist`
+
+Add a Rewrite rule so client-side navigation paths return the SPA entry point:
+
+| Source | Destination | Action |
+| --- | --- | --- |
+| `/*` | `/index.html` | `Rewrite` (HTTP `200`) |
 
 Your data stays in localStorage on each device and browser.
 
@@ -77,3 +83,11 @@ Streaks includes manual two-way cloud synchronization for authenticated accounts
 Streaks can be added to your phone's Home Screen and works offline after it has loaded once.
 On Android/Chrome, use the browser's **Add to Home screen** or **Install app** option.
 No app store installation is required.
+
+### Test offline behavior manually
+
+1. Serve a production build over HTTPS (or localhost) and open the app while online.
+2. In browser DevTools, open **Application → Service Workers** and confirm the worker is activated and controlling the page.
+3. Open **Network**, enable **Offline**, then reload. The app shell and its hashed Vite JavaScript/CSS assets should still load.
+4. While offline, confirm the browser reports API requests as unavailable; API requests are deliberately never cached.
+5. Disable **Offline**, deploy a new build, reload, and check that the new worker activates and the previous `streaks-shell-*` cache is removed.

@@ -14,13 +14,9 @@ function copyStaticAssets() {
       const distDir = path.resolve(__dirname, "dist");
       if (!fs.existsSync(distDir)) return;
 
-      const swSrc = path.resolve(__dirname, "sw.js");
       const manifestSrc = path.resolve(__dirname, "manifest.webmanifest");
       const iconsSrc = path.resolve(__dirname, "icons");
 
-      if (fs.existsSync(swSrc)) {
-        fs.copyFileSync(swSrc, path.join(distDir, "sw.js"));
-      }
       if (fs.existsSync(manifestSrc)) {
         fs.copyFileSync(manifestSrc, path.join(distDir, "manifest.webmanifest"));
       }
@@ -45,4 +41,3 @@ export default defineConfig({
     sourcemap: false
   }
 });
-
