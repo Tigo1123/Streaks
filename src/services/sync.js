@@ -1,6 +1,6 @@
 import { detectedTimezone, isValidTimezone, migrationDate, offsetForDate, validDate, dateValue, DAY_MS } from "../utils/date.js";
 import { authRequest } from "./api.js";
-import { isApplyingSyncState, setApplyingSyncState, STORAGE_KEY } from "./storage.js";
+import { commitIfUnchanged, STORAGE_KEY } from "./storage.js";
 
 export const SYNC_META_KEY = "streaks-cloud-sync-v1";
 export const SYNC_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -1011,13 +1011,14 @@ export async function runCloudSync({
   };
 
   // 8. Commit local storage with applyingSyncState lock
-  setApplyingSyncState(true);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(plan.nextState));
-  } catch (_) {
+    const committed = await commitIfUnchanged(local.raw, plan.nextState);
+    if (!committed.ok) {
+      throw new Error(committed.error?.code === "storage-conflict" ? "syncDataConflict" : "syncLocalWrite");
+    }
+  } catch (error) {
+    if (error?.message === "syncDataConflict") throw error;
     throw new Error("syncLocalWrite");
-  } finally {
-    setApplyingSyncState(false);
   }
 
   if (!saveSyncMetadata(store)) throw new Error("syncStorage");

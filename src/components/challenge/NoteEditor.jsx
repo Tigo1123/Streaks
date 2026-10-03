@@ -15,12 +15,12 @@ export function NoteEditor({ initialNote = "", onSave, onDelete, language }) {
     setIsDirty(true);
   };
 
-  const handleSave = () => {
-    if (onSave(text)) setIsDirty(false);
+  const handleSave = async () => {
+    if (await onSave(text)) setIsDirty(false);
   };
 
-  const handleDelete = () => {
-    if (onDelete()) {
+  const handleDelete = async () => {
+    if (await onDelete()) {
       setText("");
       setIsDirty(false);
     }

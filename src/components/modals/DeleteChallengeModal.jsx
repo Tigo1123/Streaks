@@ -13,9 +13,9 @@ export function DeleteChallengeModal() {
   const isOpen = modalMode === "delete";
   const isRtl = language === "ar";
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (selectedChallengeId) {
-      const result = deleteChallenge(selectedChallengeId);
+      const result = await deleteChallenge(selectedChallengeId);
       if (!result.ok) return;
       showToast(isRtl ? "تم حذف التحدي" : "Challenge deleted");
       closeModal();

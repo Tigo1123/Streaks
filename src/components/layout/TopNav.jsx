@@ -17,13 +17,13 @@ export function TopNav({ onToggleSidebar }) {
 
   const isRtl = language === "ar";
 
-  const toggleLanguage = () => {
-    setLanguage(language === "en" ? "ar" : "en");
+  const toggleLanguage = async () => {
+    await setLanguage(language === "en" ? "ar" : "en");
   };
 
-  const handleReminderToggle = () => {
+  const handleReminderToggle = async () => {
     if (remindersEnabled) {
-      const result = disableReminders();
+      const result = await disableReminders();
       if (result.ok) showToast(t("reminderOff", {}, language));
     } else {
       enableReminders();

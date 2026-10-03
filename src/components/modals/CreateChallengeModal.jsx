@@ -27,7 +27,7 @@ export function CreateChallengeModal() {
     wasOpen.current = isOpen;
   }, [isOpen, today]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
@@ -44,7 +44,7 @@ export function CreateChallengeModal() {
       return;
     }
 
-    const result = createChallenge({
+    const result = await createChallenge({
       name: trimmedName,
       durationDays,
       startDate: startDate || today,

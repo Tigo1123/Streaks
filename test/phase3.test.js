@@ -35,7 +35,10 @@ import {
   saveRawBackup,
   isApplyingSyncState,
   setApplyingSyncState,
-  createInitialState
+  createInitialState,
+  mutateState,
+  loadRawValue,
+  commitIfUnchanged
 } from "../src/services/storage.js";
 import {
   AUTH_TOKEN_KEY,
@@ -405,6 +408,129 @@ test("QuotaExceeded while persisting returns an error and preserves prior data",
   assert.equal(result.ok, false);
   assert.equal(result.error.name, "QuotaExceededError");
   assert.equal(localStorage.getItem(STORAGE_KEY), original);
+});
+
+test("mutations serialize and apply each toggle to the latest stored challenge", async () => {
+  localStorage.clear();
+  const challenge = {
+    id: "multi-tab-challenge",
+    name: "Read",
+    durationDays: 7,
+    startDate: "2026-10-01",
+    completedDays: [],
+    createdAt: "2026-10-01T10:00:00.000Z"
+  };
+  persist({ ...createInitialState(), challenges: [challenge] });
+
+  const toggle = (day) => mutateState((current) => {
+    const item = current.challenges[0];
+    const completedDays = item.completedDays.includes(day)
+      ? item.completedDays.filter((value) => value !== day)
+      : [...item.completedDays, day].sort((a, b) => a - b);
+    return {
+      state: {
+        ...current,
+        challenges: [{ ...item, completedDays }]
+      }
+    };
+  });
+
+  const [first, second] = await Promise.all([toggle(1), toggle(2)]);
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  assert.deepEqual(load().state.challenges[0].completedDays, [1, 2]);
+});
+
+test("mutate retries from a changed revision and reapplies the operation", async () => {
+  localStorage.clear();
+  persist(createInitialState());
+  let calls = 0;
+  const result = await mutateState((current) => {
+    calls++;
+    if (calls === 1) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, language: "ar" }));
+    }
+    return { state: { ...current, reminders: { ...current.reminders, enabled: true } } };
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls, 2);
+  assert.equal(result.state.language, "ar");
+  assert.equal(result.state.reminders.enabled, true);
+});
+
+test("mutate enters recovery on corrupt or unsupported cross-tab data without overwriting it", async () => {
+  for (const raw of ["{broken", JSON.stringify({ version: VERSION + 1, challenges: [] })]) {
+    localStorage.clear();
+    localStorage.setItem(STORAGE_KEY, raw);
+    const result = await mutateState((current) => ({ state: { ...current, language: "ar" } }));
+    assert.equal(result.ok, false);
+    assert.ok(result.loadResult);
+    assert.equal(localStorage.getItem(STORAGE_KEY), raw);
+    assert.equal(loadRawValue(raw).ok, false);
+  }
+});
+
+test("revision retries do not create backups for valid stored data", async () => {
+  localStorage.clear();
+  persist(createInitialState());
+  let calls = 0;
+  const result = await mutateState((current) => {
+    calls++;
+    if (calls === 1) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, language: "ar" }));
+    }
+    return { state: { ...current, reminders: { ...current.reminders, enabled: true } } };
+  });
+  assert.equal(result.ok, true);
+  assert.equal([...localStorage.store.keys()].filter((key) => key.startsWith(BACKUP_PREFIX)).length, 0);
+});
+
+test("mutations use Web Locks when available", async () => {
+  localStorage.clear();
+  persist(createInitialState());
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const requestedLocks = [];
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      locks: {
+        request: async (name, options, operation) => {
+          requestedLocks.push({ name, options });
+          return operation();
+        }
+      }
+    }
+  });
+
+  try {
+    const result = await mutateState((current) => ({
+      state: { ...current, language: "ar" }
+    }));
+    assert.equal(result.ok, true);
+    assert.deepEqual(requestedLocks, [{
+      name: `${STORAGE_KEY}-mutate`,
+      options: { mode: "exclusive" }
+    }]);
+  } finally {
+    Object.defineProperty(globalThis, "navigator", originalNavigator);
+  }
+});
+
+test("guarded commits refuse to overwrite storage changed by another tab", async () => {
+  localStorage.clear();
+  const initial = createInitialState();
+  persist(initial);
+  const originalRaw = localStorage.getItem(STORAGE_KEY);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...initial, language: "ar" }));
+
+  const result = await commitIfUnchanged(originalRaw, {
+    ...initial,
+    reminders: { enabled: true, lastReminderDate: "" }
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "storage-conflict");
+  assert.equal(JSON.parse(localStorage.getItem(STORAGE_KEY)).language, "ar");
 });
 
 test("Invalid challenge is quarantined while two valid challenges load", () => {

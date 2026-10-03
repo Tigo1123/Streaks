@@ -31,7 +31,7 @@ export function ImportExportModal() {
       const confirmed = window.confirm(t("importConfirm", {}, language));
       if (!confirmed) return;
 
-      const result = importData(parsed);
+      const result = await importData(parsed);
       if (result !== true) return;
       showToast(t("importDone", {}, language));
       closeModal();

@@ -6,6 +6,7 @@ export const BACKUP_PREFIX = `${STORAGE_KEY}-backup-`;
 export const VERSION = 1;
 
 let applyingSyncState = false;
+let fallbackMutationQueue = Promise.resolve();
 const migrations = {
   0: (data) => ({ ...data, version: 1 })
 };
@@ -170,14 +171,7 @@ export function snapshot(state) {
  *
  * @returns {{ ok: boolean, state: object, raw: string | null, error: any, quarantinedCount: number }}
  */
-export function load() {
-  let raw;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch (error) {
-    return { ok: false, state: createInitialState(), raw: null, error: { code: "storage-unavailable", cause: error }, quarantinedCount: 0 };
-  }
-
+function readStoredValue(raw, { createBackups = true, persistMigrations = true } = {}) {
   if (raw === null) {
     return { ok: true, state: createInitialState(), raw: null, error: null, quarantinedCount: 0 };
   }
@@ -201,11 +195,13 @@ export function load() {
   let migrated = data;
   let backedUp = false;
   if (sourceVersion < VERSION) {
-    const backup = saveRawBackup(raw);
-    if (!backup.ok) {
-      return { ok: false, state: createInitialState(), raw, error: { code: "backup-failed", cause: backup.error }, quarantinedCount: 0 };
+    if (createBackups) {
+      const backup = saveRawBackup(raw);
+      if (!backup.ok) {
+        return { ok: false, state: createInitialState(), raw, error: { code: "backup-failed", cause: backup.error }, quarantinedCount: 0 };
+      }
+      backedUp = true;
     }
-    backedUp = true;
 
     try {
       for (let version = sourceVersion; version < VERSION; version++) {
@@ -223,10 +219,15 @@ export function load() {
       return { ok: false, state: createInitialState(), raw, error: { code: "invalid-schema" }, quarantinedCount: 0 };
     }
 
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-    } catch (error) {
-      return { ok: false, state: createInitialState(), raw, error: { code: "migration-write-failed", cause: error }, quarantinedCount: 0 };
+    if (persistMigrations) {
+      try {
+        if (localStorage.getItem(STORAGE_KEY) !== raw) {
+          return readStoredValue(localStorage.getItem(STORAGE_KEY), { createBackups: false, persistMigrations: false });
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      } catch (error) {
+        return { ok: false, state: createInitialState(), raw, error: { code: "migration-write-failed", cause: error }, quarantinedCount: 0 };
+      }
     }
   }
 
@@ -236,7 +237,7 @@ export function load() {
 
   const challenges = migrated.challenges.filter(validChallenge);
   const quarantinedCount = migrated.challenges.length - challenges.length;
-  if (quarantinedCount > 0 && !backedUp) {
+  if (quarantinedCount > 0 && !backedUp && createBackups) {
     const backup = saveRawBackup(raw);
     if (!backup.ok) {
       return { ok: false, state: createInitialState(), raw, error: { code: "backup-failed", cause: backup.error }, quarantinedCount: 0 };
@@ -251,6 +252,102 @@ export function load() {
   };
 
   return { ok: true, state, raw, error: null, quarantinedCount };
+}
+
+export function load() {
+  let raw;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    return { ok: false, state: createInitialState(), raw: null, error: { code: "storage-unavailable", cause: error }, quarantinedCount: 0 };
+  }
+  return readStoredValue(raw);
+}
+
+export function loadRawValue(raw) {
+  return readStoredValue(raw, { createBackups: false, persistMigrations: false });
+}
+
+function withMutationLock(operation) {
+  if (typeof navigator !== "undefined" && navigator.locks?.request) {
+    return navigator.locks.request(`${STORAGE_KEY}-mutate`, { mode: "exclusive" }, operation);
+  }
+
+  const result = fallbackMutationQueue.then(operation, operation);
+  fallbackMutationQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+export async function mutateState(updater, maxRetries = 3) {
+  try {
+    return await withMutationLock(async () => {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        let loaded;
+        try {
+          loaded = attempt === 0 ? load() : loadRawValue(localStorage.getItem(STORAGE_KEY));
+        } catch (error) {
+          return { ok: false, error, state: null };
+        }
+        if (!loaded.ok) return { ok: false, error: loaded.error, state: null, loadResult: loaded };
+
+        let change;
+        try {
+          change = updater(snapshot(loaded.state));
+        } catch (error) {
+          return { ok: false, error, state: loaded.state };
+        }
+        if (change?.ok === false) return { ...change, state: loaded.state, raw: loaded.raw };
+
+        const nextState = change?.state || change;
+        if (!nextState || typeof nextState !== "object") {
+          return { ok: false, error: new Error("Mutation updater must return a state"), state: loaded.state };
+        }
+
+        let currentRaw;
+        try {
+          currentRaw = localStorage.getItem(STORAGE_KEY);
+        } catch (error) {
+          return { ok: false, error, state: loaded.state };
+        }
+        if (currentRaw !== loaded.raw) continue;
+
+        const result = persist(nextState, loaded.raw);
+        if (!result.ok) return { ...result, state: loaded.state, raw: loaded.raw };
+        return {
+          ...result,
+          state: nextState,
+          raw: JSON.stringify(nextState),
+          value: Object.hasOwn(change, "value") ? change.value : undefined,
+          quarantinedCount: 0
+        };
+      }
+      return {
+        ok: false,
+        error: Object.assign(new Error("Stored data changed repeatedly; retry the operation"), { code: "storage-conflict" }),
+        state: null
+      };
+    });
+  } catch (error) {
+    return { ok: false, error, state: null };
+  }
+}
+
+export async function commitIfUnchanged(expectedRaw, state) {
+  return withMutationLock(async () => {
+    try {
+      if (localStorage.getItem(STORAGE_KEY) !== expectedRaw) {
+        return { ok: false, error: Object.assign(new Error("Stored data changed; retry synchronization"), { code: "storage-conflict" }) };
+      }
+      setApplyingSyncState(true);
+      try {
+        return persist(state, expectedRaw);
+      } finally {
+        setApplyingSyncState(false);
+      }
+    } catch (error) {
+      return { ok: false, error };
+    }
+  });
 }
 
 /**
@@ -282,17 +379,21 @@ export function persist(state, previousRaw = null) {
  * @param {string} raw
  * @returns {{ ok: boolean, error: any }}
  */
-export function replaceWithInitialState(raw) {
-  const backup = saveRawBackup(raw);
-  if (!backup.ok) return { ok: false, error: backup.error };
-
-  try {
-    if (localStorage.getItem(STORAGE_KEY) !== raw) {
-      return { ok: false, error: new Error("Stored data changed; retry recovery") };
+export async function replaceWithInitialState(raw) {
+  return withMutationLock(async () => {
+    try {
+      if (localStorage.getItem(STORAGE_KEY) !== raw) {
+        return { ok: false, error: new Error("Stored data changed; retry recovery") };
+      }
+      const backup = saveRawBackup(raw);
+      if (!backup.ok) return { ok: false, error: backup.error };
+      if (localStorage.getItem(STORAGE_KEY) !== raw) {
+        return { ok: false, error: new Error("Stored data changed; retry recovery") };
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(createInitialState()));
+      return { ok: true, error: null };
+    } catch (error) {
+      return { ok: false, error };
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(createInitialState()));
-    return { ok: true, error: null };
-  } catch (error) {
-    return { ok: false, error };
-  }
+  });
 }

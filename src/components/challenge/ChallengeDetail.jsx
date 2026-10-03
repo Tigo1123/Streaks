@@ -36,18 +36,18 @@ export function ChallengeDetail() {
   const stats = streakStats(challenge, today);
   const completedCount = challenge.completedDays.length;
 
-  const handleToggle = (day) => {
-    toggleCompletion(challenge.id, day);
+  const handleToggle = async (day) => {
+    await toggleCompletion(challenge.id, day);
   };
 
-  const handleSaveNote = (text) => {
-    const result = saveNote(challenge.id, text);
+  const handleSaveNote = async (text) => {
+    const result = await saveNote(challenge.id, text);
     if (result.ok) showToast(t("saved", {}, language));
     return result.ok;
   };
 
-  const handleDeleteNote = () => {
-    const result = deleteNote(challenge.id);
+  const handleDeleteNote = async () => {
+    const result = await deleteNote(challenge.id);
     if (result.ok) showToast(isRtl ? "تم حذف الملاحظة" : "Note cleared");
     return result.ok;
   };

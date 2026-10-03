@@ -1,5 +1,5 @@
-import React, { createContext, useState, useCallback, useRef } from "react";
-import { load, persist, replaceWithInitialState, validImportChallenge, normalizeReminders, VERSION } from "../services/storage.js";
+import React, { createContext, useState, useCallback, useRef, useEffect } from "react";
+import { load, loadRawValue, mutateState, replaceWithInitialState, validImportChallenge, normalizeReminders, VERSION, STORAGE_KEY } from "../services/storage.js";
 import { migrationUuid } from "../services/sync.js";
 import { progress } from "../utils/streakCalculations.js";
 import { validDate } from "../utils/date.js";
@@ -15,32 +15,67 @@ export function StreaksProvider({ children }) {
   stateRef.current = state;
   const { showToast } = useToast();
 
-  const persistState = useCallback((nextState) => {
-    const previousRaw = JSON.stringify(stateRef.current);
-    const result = persist(nextState, previousRaw);
+  const updateFromStorage = useCallback((result) => {
+    stateRef.current = result.state;
+    setLoadResult(result);
+  }, []);
+
+  const runMutation = useCallback(async (updater) => {
+    const result = await mutateState(updater);
     if (result.ok) {
-      stateRef.current = nextState;
-      setLoadResult((current) => ({
-        ...current,
+      updateFromStorage({
         ok: true,
-        state: nextState,
-        raw: JSON.stringify(nextState),
+        state: result.state,
+        raw: result.raw,
         error: null,
-        quarantinedCount: 0
-      }));
+        quarantinedCount: result.quarantinedCount || 0
+      });
+    } else if (result.loadResult) {
+      updateFromStorage(result.loadResult);
     } else {
+      if (result.state && result.raw !== undefined) {
+        updateFromStorage({
+          ok: true,
+          state: result.state,
+          raw: result.raw,
+          error: null,
+          quarantinedCount: 0
+        });
+      }
       showToast(t("saveFailed", {}, stateRef.current.language), "danger");
     }
     return result;
-  }, [showToast]);
+  }, [showToast, updateFromStorage]);
 
-  const createChallenge = useCallback(({ name, durationDays, startDate }) => {
+  useEffect(() => {
+    const handleStorage = (event) => {
+      if (event.key !== STORAGE_KEY || event.storageArea !== localStorage) return;
+      if (event.newValue === loadResult.raw) return;
+
+      let latest;
+      try {
+        latest = loadRawValue(localStorage.getItem(STORAGE_KEY));
+      } catch (error) {
+        latest = {
+          ok: false,
+          state: stateRef.current,
+          raw: null,
+          error: { code: "storage-unavailable", cause: error },
+          quarantinedCount: 0
+        };
+      }
+      updateFromStorage(latest);
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [loadResult.raw, updateFromStorage]);
+
+  const createChallenge = useCallback(async ({ name, durationDays, startDate }) => {
     const trimmedName = String(name || "").trim();
     const duration = Number(durationDays);
 
-    if (!trimmedName) {
-      throw new Error("required");
-    }
+    if (!trimmedName) throw new Error("required");
     if (!Number.isInteger(duration) || duration < 1 || duration > 365 || !validDate(startDate)) {
       throw new Error("invalidDate");
     }
@@ -54,119 +89,113 @@ export function StreaksProvider({ children }) {
       createdAt: new Date().toISOString()
     };
 
-    const nextState = {
-      ...stateRef.current,
-      challenges: [newChallenge, ...stateRef.current.challenges]
-    };
+    const result = await runMutation((current) => ({
+      state: { ...current, challenges: [newChallenge, ...current.challenges] },
+      value: newChallenge
+    }));
+    return { ...result, challenge: result.ok ? result.value : null };
+  }, [runMutation]);
 
-    const result = persistState(nextState);
-    return { ...result, challenge: result.ok ? newChallenge : null };
-  }, [persistState]);
+  const updateChallenge = useCallback((id, updates) => runMutation((current) => ({
+    state: {
+      ...current,
+      challenges: current.challenges.map((challenge) =>
+        challenge.id === id ? { ...challenge, ...updates } : challenge
+      )
+    }
+  })), [runMutation]);
 
-  const updateChallenge = useCallback((id, updates) => {
-    const nextChallenges = stateRef.current.challenges.map((c) => {
-      if (c.id !== id) return c;
-      return { ...c, ...updates };
-    });
-
-    const nextState = { ...stateRef.current, challenges: nextChallenges };
-    return persistState(nextState);
-  }, [persistState]);
-
-  const deleteChallenge = useCallback((id) => {
-    const nextChallenges = stateRef.current.challenges.filter((c) => c.id !== id);
-    const nextState = { ...stateRef.current, challenges: nextChallenges };
-    return persistState(nextState);
-  }, [persistState]);
+  const deleteChallenge = useCallback((id) => runMutation((current) => ({
+    state: { ...current, challenges: current.challenges.filter((challenge) => challenge.id !== id) }
+  })), [runMutation]);
 
   const toggleCompletion = useCallback((challengeId, dayNumber) => {
     const day = Number(dayNumber);
-    const challenge = stateRef.current.challenges.find((c) => c.id === challengeId);
-    if (!challenge) return { ok: false, error: new Error("challenge-not-found"), success: false };
+    return runMutation((current) => {
+      const challenge = current.challenges.find((item) => item.id === challengeId);
+      if (!challenge) return { ok: false, error: new Error("challenge-not-found") };
 
-    const was100 = progress(challenge) === 100;
-    const exists = challenge.completedDays.includes(day);
-    const nextCompleted = exists
-      ? challenge.completedDays.filter((n) => n !== day)
-      : [...challenge.completedDays, day].sort((a, b) => a - b);
-
-    const updatedChallenge = { ...challenge, completedDays: nextCompleted };
-    const nextChallenges = stateRef.current.challenges.map((c) =>
-      c.id === challengeId ? updatedChallenge : c
-    );
-
-    const nextState = { ...stateRef.current, challenges: nextChallenges };
-    const result = persistState(nextState);
-
-    const is100 = progress(updatedChallenge) === 100;
-    return {
+      const wasComplete = progress(challenge) === 100;
+      const completedDays = challenge.completedDays.includes(day)
+        ? challenge.completedDays.filter((item) => item !== day)
+        : [...challenge.completedDays, day].sort((a, b) => a - b);
+      const updatedChallenge = { ...challenge, completedDays };
+      const nextState = {
+        ...current,
+        challenges: current.challenges.map((item) => item.id === challengeId ? updatedChallenge : item)
+      };
+      return {
+        state: nextState,
+        value: {
+          challenge: updatedChallenge,
+          wasComplete,
+          isComplete: progress(updatedChallenge) === 100
+        }
+      };
+    }).then((result) => ({
       ...result,
       success: result.ok,
-      challenge: result.ok ? updatedChallenge : challenge,
-      wasComplete: was100,
-      isComplete: is100,
-      justCompleted: result.ok && !was100 && is100
-    };
-  }, [persistState]);
+      challenge: result.ok ? result.value.challenge : null,
+      wasComplete: result.ok ? result.value.wasComplete : false,
+      isComplete: result.ok ? result.value.isComplete : false,
+      justCompleted: result.ok && !result.value.wasComplete && result.value.isComplete
+    }));
+  }, [runMutation]);
 
   const saveNote = useCallback((challengeId, noteText) => {
     const trimmed = String(noteText || "").trim();
-    const challenge = stateRef.current.challenges.find((c) => c.id === challengeId);
-    if (!challenge) return { ok: false, error: new Error("challenge-not-found") };
-
-    const updated = { ...challenge, note: trimmed };
-    const nextChallenges = stateRef.current.challenges.map((c) =>
-      c.id === challengeId ? updated : c
-    );
-
-    return persistState({ ...stateRef.current, challenges: nextChallenges });
-  }, [persistState]);
+    return runMutation((current) => {
+      if (!current.challenges.some((challenge) => challenge.id === challengeId)) {
+        return { ok: false, error: new Error("challenge-not-found") };
+      }
+      return {
+        state: {
+          ...current,
+          challenges: current.challenges.map((challenge) =>
+            challenge.id === challengeId ? { ...challenge, note: trimmed } : challenge
+          )
+        }
+      };
+    });
+  }, [runMutation]);
 
   const deleteNote = useCallback((challengeId) => {
-    const challenge = stateRef.current.challenges.find((c) => c.id === challengeId);
-    if (!challenge) return { ok: false, error: new Error("challenge-not-found") };
-
-    const updated = { ...challenge };
-    delete updated.note;
-
-    const nextChallenges = stateRef.current.challenges.map((c) =>
-      c.id === challengeId ? updated : c
-    );
-
-    return persistState({ ...stateRef.current, challenges: nextChallenges });
-  }, [persistState]);
+    return runMutation((current) => {
+      if (!current.challenges.some((challenge) => challenge.id === challengeId)) {
+        return { ok: false, error: new Error("challenge-not-found") };
+      }
+      return {
+        state: {
+          ...current,
+          challenges: current.challenges.map((challenge) => {
+            if (challenge.id !== challengeId) return challenge;
+            const updated = { ...challenge };
+            delete updated.note;
+            return updated;
+          })
+        }
+      };
+    });
+  }, [runMutation]);
 
   const setLanguage = useCallback((lang) => {
     const normalized = lang === "ar" ? "ar" : "en";
-    if (stateRef.current.language === normalized) return { ok: true, error: null };
-
-    return persistState({
-      ...stateRef.current,
-      language: normalized
-    });
-  }, [persistState]);
+    return runMutation((current) => ({ state: { ...current, language: normalized } }));
+  }, [runMutation]);
 
   const setRemindersEnabled = useCallback((enabled) => {
-    return persistState({
-      ...stateRef.current,
-      reminders: {
-        ...stateRef.current.reminders,
-        enabled: Boolean(enabled)
-      }
-    });
-  }, [persistState]);
+    return runMutation((current) => ({
+      state: { ...current, reminders: { ...current.reminders, enabled: Boolean(enabled) } }
+    }));
+  }, [runMutation]);
 
   const setLastReminderDate = useCallback((dateStr) => {
-    return persistState({
-      ...stateRef.current,
-      reminders: {
-        ...stateRef.current.reminders,
-        lastReminderDate: dateStr
-      }
-    });
-  }, [persistState]);
+    return runMutation((current) => ({
+      state: { ...current, reminders: { ...current.reminders, lastReminderDate: dateStr } }
+    }));
+  }, [runMutation]);
 
-  const importData = useCallback((data) => {
+  const importData = useCallback(async (data) => {
     const ids = new Set();
     if (
       !data ||
@@ -182,17 +211,17 @@ export function StreaksProvider({ children }) {
       throw new Error("importBad");
     }
 
-    const nextState = {
-      version: VERSION,
-      language: data.language,
-      challenges: data.challenges,
-      reminders: normalizeReminders(stateRef.current.reminders)
-    };
-
-    const saved = persistState(nextState);
+    const saved = await runMutation((current) => ({
+      state: {
+        version: VERSION,
+        language: data.language,
+        challenges: data.challenges,
+        reminders: normalizeReminders(current.reminders)
+      }
+    }));
     if (!saved.ok) return saved;
     return true;
-  }, [persistState]);
+  }, [runMutation]);
 
   const retryLoad = useCallback(() => {
     const result = load();
@@ -201,20 +230,19 @@ export function StreaksProvider({ children }) {
     return result;
   }, []);
 
-  const startFresh = useCallback(() => {
+  const startFresh = useCallback(async () => {
     if (!loadResult.raw || loadResult.error?.code === "storage-unavailable") {
       return { ok: false, error: new Error("Raw data is unavailable for safe recovery") };
     }
-    const result = replaceWithInitialState(loadResult.raw);
+    const result = await replaceWithInitialState(loadResult.raw);
     if (!result.ok) {
       showToast(t("saveFailed", {}, stateRef.current.language), "danger");
       return result;
     }
     const fresh = load();
-    stateRef.current = fresh.state;
-    setLoadResult(fresh);
+    updateFromStorage(fresh);
     return result;
-  }, [loadResult, showToast]);
+  }, [loadResult, showToast, updateFromStorage]);
 
   const exportData = useCallback(() => {
     const raw = JSON.stringify(stateRef.current, null, 2);
@@ -229,9 +257,8 @@ export function StreaksProvider({ children }) {
 
   const reloadFromStorage = useCallback(() => {
     const freshlyLoaded = load();
-    stateRef.current = freshlyLoaded.state;
-    setLoadResult(freshlyLoaded);
-  }, []);
+    updateFromStorage(freshlyLoaded);
+  }, [updateFromStorage]);
 
   const value = {
     challenges: state.challenges,

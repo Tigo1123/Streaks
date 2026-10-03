@@ -16,14 +16,14 @@ export function StorageRecoveryScreen() {
     setTimeout(() => URL.revokeObjectURL(url), 100);
   };
 
-  const handleStartFresh = () => {
+  const handleStartFresh = async () => {
     const confirmed = window.confirm(
       "This will replace the unreadable Streaks data. A raw backup will be saved first. Continue?\n\n" +
       "سيتم استبدال بيانات Streaks غير المقروءة بعد حفظ نسخة خام منها. هل تريد المتابعة؟"
     );
     if (!confirmed) return;
 
-    const result = startFresh();
+    const result = await startFresh();
     if (!result.ok) return;
   };
 

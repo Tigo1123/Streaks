@@ -15,7 +15,7 @@ export function useReminders() {
   const isSupported = typeof window !== "undefined" && typeof window.Notification !== "undefined";
   const permission = isSupported ? window.Notification.permission : "unsupported";
 
-  const checkReminder = useCallback(() => {
+  const checkReminder = useCallback(async () => {
     if (
       !reminders.enabled ||
       typeof document === "undefined" ||
@@ -26,7 +26,7 @@ export function useReminders() {
     }
 
     if (Notification.permission === "denied") {
-      setRemindersEnabled(false);
+      await setRemindersEnabled(false);
       showToast(t("reminderDenied", {}, language));
       return;
     }
@@ -54,7 +54,7 @@ export function useReminders() {
         renotify: false
       });
 
-      setLastReminderDate(today);
+      await setLastReminderDate(today);
 
       notice.onclick = () => {
         if (typeof window !== "undefined") {
@@ -74,8 +74,8 @@ export function useReminders() {
       return;
     }
 
-    const applyEnabled = () => {
-      const saved = setRemindersEnabled(true);
+    const applyEnabled = async () => {
+      const saved = await setRemindersEnabled(true);
       if (!saved.ok) return;
       const hasPending = challenges.some((c) => {
         const day = dayIndex(c, today);
@@ -83,12 +83,12 @@ export function useReminders() {
       });
 
       showToast(t(hasPending ? "reminderEnabled" : "reminderNoChallenges", {}, language));
-      checkReminder();
+      await checkReminder();
     };
 
     try {
       if (Notification.permission === "granted") {
-        applyEnabled();
+        await applyEnabled();
         return;
       }
       if (Notification.permission === "denied") {
@@ -98,7 +98,7 @@ export function useReminders() {
 
       const requested = await Notification.requestPermission();
       if (requested === "granted") {
-        applyEnabled();
+        await applyEnabled();
       } else if (requested === "denied") {
         showToast(t("reminderDenied", {}, language));
       }

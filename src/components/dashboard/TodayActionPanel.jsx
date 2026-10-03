@@ -41,8 +41,8 @@ export function TodayActionPanel() {
   const completedCount = todayChallenges.filter((item) => item.isDoneToday).length;
   const allCompleted = completedCount === todayChallenges.length;
 
-  const handleCheckIn = (challengeId, day, wasDone) => {
-    const result = toggleCompletion(challengeId, day);
+  const handleCheckIn = async (challengeId, day, wasDone) => {
+    const result = await toggleCompletion(challengeId, day);
     if (!result.ok) return;
     if (!wasDone) {
       setJustCelebratedId(challengeId);
