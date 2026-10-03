@@ -469,7 +469,7 @@ $("#exportButton").addEventListener("click",()=>{const blob=new Blob([JSON.strin
 $("#importButton").addEventListener("click",()=>$("#importFile").click());
 $("#importFile").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;try{const data=JSON.parse(await file.text()),ids=new Set();if(!data||data.version!==VERSION||!Array.isArray(data.challenges)||!data.challenges.every(c=>{if(!validImportChallenge(c)||ids.has(c.id))return false;ids.add(c.id);return true})||(data.language!=="en"&&data.language!=="ar"))throw Error();if(!window.confirm(t("importConfirm")))return;const before=snapshot();state={version:VERSION,language:data.language,challenges:data.challenges,reminders:normalizeReminders(state.reminders)};if(!persist()){state=before;return}selectedId=null;render();showToast(t("importDone"));checkReminder()}catch(_){showToast(t("importBad"))}});
 load();if(state.reminders.enabled&&typeof window.Notification!=="undefined"&&Notification.permission==="denied"){state.reminders.enabled=false;persist()}render();checkReminder();void restoreSession();
-if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("./sw.js").catch(()=>{});});}
+if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("./sw.js").then(reg=>{reg.update().catch(()=>{});}).catch(()=>{});});}
 </script>
 </body>
 </html>
