@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test test/phase3.test.js test/phase4.test.js test/phase5.test.js"
+    "test": "node --test test/phase3.test.js test/phase4.test.js test/phase5.test.js test/phase6.test.js"
   },
   "dependencies": {
     "react": "^18.3.1",

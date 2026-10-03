@@ -2,9 +2,9 @@ import React from "react";
 import { progress, streakStats, remaining } from "../../utils/streakCalculations.js";
 import { t } from "../../i18n/index.js";
 
-export function StreakMetrics({ challenge, language }) {
+export function StreakMetrics({ challenge, language, today }) {
   const p = progress(challenge);
-  const s = streakStats(challenge);
+  const s = streakStats(challenge, today);
   const rem = remaining(challenge);
 
   return (

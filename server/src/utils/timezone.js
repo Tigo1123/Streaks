@@ -5,6 +5,8 @@ const formatters = new Map();
 function formatterFor(timezone) {
   if (!formatters.has(timezone)) {
     formatters.set(timezone, new Intl.DateTimeFormat("en-CA", {
+      calendar: "gregory",
+      numberingSystem: "latn",
       timeZone: timezone,
       year: "numeric",
       month: "2-digit",

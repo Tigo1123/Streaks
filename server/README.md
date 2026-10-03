@@ -1,6 +1,6 @@
 # Streaks API foundation
 
-This is a separate Express/PostgreSQL API. The static PWA calls only the account routes for registration, login, and session validation. Its challenge, completion, note, preference, reminder, import/export, and offline workflows continue to use their existing localStorage behavior; the frontend does not call the cloud data routes yet.
+This is a separate Express/PostgreSQL API. The static PWA uses its account routes and authenticated challenge, completion, note, preference, backup, and synchronization routes. The app remains local-first, and its offline workflows continue to use browser storage.
 
 ## Requirements
 
@@ -43,9 +43,11 @@ Ownership is always derived from the verified JWT; clients must not send a user 
 | Method and path | Authentication | Request | Success |
 | --- | --- | --- | --- |
 | `GET /api/health` | No | — | `200 {"status":"ok"}` |
-| `POST /api/auth/register` | No | `{ "email":"user@example.com", "password":"at-least-8-characters" }` | `201 {"user":{"id":"…","email":"…","createdAt":"…"}}` |
-| `POST /api/auth/login` | No | Same fields as registration | `200 {"token":"…","user":{…}}`; one-hour JWT contains only subject and standard time claims |
-| `GET /api/auth/me` | Yes | — | `200 {"user":{"id":"…","email":"…","createdAt":"…"}}` |
+| `POST /api/auth/register` | No | `{ "email":"user@example.com", "password":"at-least-8-characters" }` | `201 {"user":{"id":"…","email":"…","timezone":null,"createdAt":"…"},"time":{…}}` |
+| `POST /api/auth/login` | No | Same fields as registration | `200 {"token":"…","user":{…},"time":{…}}`; one-hour JWT contains only subject and standard time claims |
+| `GET /api/auth/me` | Yes | — | `200 {"user":{"id":"…","email":"…","timezone":null,"createdAt":"…"},"time":{…}}` |
+
+The `time` object includes `today`, `serverNow`, and `nextMidnightAt`, with dates calculated using the user's IANA time zone. A null stored time zone uses UTC until the client sets its browser-detected zone.
 
 The frontend keeps the one-hour JWT in a dedicated `sessionStorage` entry so a page refresh in the same tab can restore the account with `/api/auth/me`. The token is removed on logout or when `/me` confirms it is invalid. If `/me` cannot reach the server, the token is retained for retry while local Streaks stays usable. Browser storage is readable by page scripts, unlike a backend-set HttpOnly cookie; use HTTPS and protect the static frontend against script injection. Logout never clears the PWA's `streaks-data` localStorage value.
 
@@ -65,7 +67,7 @@ The challenge create endpoint also accepts an optional UUID `migrationKey` for e
 
 ### Completions
 
-Completion dates must be real dates within the challenge's configured date range and cannot be later than the API server's current UTC date. The database unique constraint prevents duplicate completion dates even under concurrent requests.
+Completion dates must be real dates within the challenge's configured date range and cannot be later than tomorrow in the user's time zone. This one-day allowance supports syncing around midnight; stored completions are not rejected merely because their date is now in the future. The database unique constraint prevents duplicate completion dates even under concurrent requests.
 
 | Method and path | Request | Success | Common errors |
 | --- | --- | --- | --- |
@@ -85,12 +87,14 @@ There is at most one note per challenge. Content is limited to 1,000 characters 
 
 ### Preferences
 
-Only `language` (`en` or `ar`) and `remindersEnabled` (boolean) are accepted. The GET route creates the default row if it is missing.
+`language` (`en` or `ar`), `remindersEnabled` (boolean), and `timezone` (a valid IANA name or `null`) are accepted. The time zone is stored on the user row; the GET route creates the default preferences row if it is missing. Both routes return the current server `time` object.
 
 | Method and path | Request | Success | Common errors |
 | --- | --- | --- | --- |
-| `GET /api/preferences` | — | `200 {"preferences":{"language":"en","remindersEnabled":false}}` | `401` |
-| `PATCH /api/preferences` | `{ "language":"ar" }`, `{ "remindersEnabled":true }`, or both | `200 {"preferences":{"language":"ar","remindersEnabled":true}}` | `400` invalid/unknown fields, `401` |
+| `GET /api/preferences` | — | `200 {"preferences":{"language":"en","remindersEnabled":false,"timezone":null},"time":{…}}` | `401` |
+| `PATCH /api/preferences` | `{ "timezone":"Africa/Khartoum" }`, language, reminders, or combinations | `200 {"preferences":{"language":"en","remindersEnabled":false,"timezone":"Africa/Khartoum"},"time":{…}}` | `400` invalid/unknown fields, `401` |
+
+`GET /api/sync` also includes `preferences.timezone` and the same `time` object, so clients can use one server-authoritative date for validation and display.
 
 Other relevant statuses are `201 Created`, `204 No Content`, and `409 Conflict`. Server/database details are not included in API error responses.
 
@@ -98,13 +102,13 @@ The frontend API base URL is configured once using the `streaks-api-base-url` me
 
 Authentication rate limits are 20 failed login attempts per IP per 15 minutes (successful logins do not count) and 5 registration attempts per IP per hour. The API sets Express `trust proxy` to `1` for Render's single reverse-proxy hop; keep this aligned with the production proxy topology.
 
-The frontend uses the auth routes and the existing challenge, completion, note, and preference routes only after the user explicitly confirms **Back up to Cloud**. The one-way backup includes supported local challenge fields, completion dates, notes, language, and reminders enabled. Local challenge IDs/created timestamps and reminder last-fire dates have no equivalent cloud field and remain local. It validates the raw local dataset, shows counts before confirmation, scopes retry metadata to the authenticated account in a separate browser-storage key, and reports partial failures. Challenges use server-enforced per-user `migrationKey` values; duplicate completions return `409` and are treated by the client as already present. Notes and preferences use the existing upsert/patch behavior. The local dataset is never deleted or replaced.
+The one-way **Back up to Cloud** action includes supported local challenge fields, completion dates, notes, language, and reminders enabled. Local challenge IDs/created timestamps and reminder last-fire dates have no equivalent cloud field and remain local. It validates the raw local dataset, shows counts before confirmation, scopes retry metadata to the authenticated account in a separate browser-storage key, and reports partial failures. Challenges use server-enforced per-user `migrationKey` values; duplicate completions return `409` and are treated by the client as already present. Notes and preferences use the existing upsert/patch behavior. The local dataset is never deleted or replaced.
 
-This backup does not load cloud data into the app and does not enable ongoing synchronization, conflict resolution, or an offline sync queue. **Phase 3C — Synchronization** remains future work.
+Cloud synchronization is available from the account panel. The server remains authoritative for the account time zone; the client's detected zone is submitted before the first sync when no server value exists.
 
 ## Database and migrations
 
-`npm run migrate` applies numbered SQL files once, recording successful migrations in `schema_migrations`. Each migration and its record are committed in one transaction. The schema uses UUIDs, cascading ownership, unique completion dates, one note per challenge, normalized unique emails, `updated_at` triggers, and a partial unique index for per-user challenge migration keys.
+`npm run migrate` applies numbered SQL files once, recording successful migrations in `schema_migrations`. Each migration and its record are committed in one transaction. Migration `004` adds nullable `users.timezone` without changing existing user data. The schema uses UUIDs, cascading ownership, unique completion dates, one note per challenge, normalized unique emails, `updated_at` triggers, and a partial unique index for per-user challenge migration keys.
 
 Keep `DATABASE_URL` secret. For a Render-hosted API in the same region as its database, use Render's internal database URL. For Supabase, obtain the CA certificate from its official SSL configuration guidance. The API enforces TLS and certificate/hostname verification. It first uses the optional `DATABASE_CA_CERT` environment variable, then `server/certs/supabase-ca.crt` if present; with neither configured, Node's default trusted CA store is used. The connection pool ignores URL `ssl`/`sslmode` overrides. Never disable certificate verification to work around certificate errors.
 
@@ -114,7 +118,7 @@ Keep `DATABASE_URL` secret. For a Render-hosted API in the same region as its da
 npm test
 ```
 
-The health route test does not require a database. Auth, schema, and two-account data API integration tests require `TEST_DATABASE_URL` pointing to a dedicated PostgreSQL database with `test` in its database name, such as `streaks_test`. The tests migrate and clear that database's `users` table (with cascading deletes), so never point it at a development or production database. Without `TEST_DATABASE_URL`, those integration checks are reported as skipped. No request rate limiter is included yet; add one to registration and login before exposing authentication to unrestricted public traffic.
+The health and timezone helper tests do not require a database. Auth, schema, and two-account data API integration tests require `TEST_DATABASE_URL` pointing to a dedicated PostgreSQL database with `test` in its database name, such as `streaks_test`. The tests migrate and clear that database's `users` table (with cascading deletes), so never point it at a development or production database. Without `TEST_DATABASE_URL`, those integration checks are reported as skipped.
 
 ## Render preparation
 

@@ -92,7 +92,7 @@ function challengeRangeContainsCompletions(startDate, duration, completionDates)
 
 function assertCompletionDate(challenge, completionDate, timezone, now = new Date()) {
   if (!completionDateAllowed(challenge, completionDate, timezone, now)) {
-    throw new ApiError(400, "Completion date must be an elapsed day within this challenge");
+    throw new ApiError(400, "Completion date must be within this challenge and no later than tomorrow");
   }
 }
 

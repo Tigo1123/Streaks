@@ -1,17 +1,74 @@
 export const DAY_MS = 86400000;
 
+const formatters = new Map();
+
+export function isValidTimezone(timezone) {
+  if (typeof timezone !== "string" || !timezone) return false;
+  try {
+    if (!formatters.has(timezone)) {
+      formatters.set(timezone, new Intl.DateTimeFormat("en-CA", {
+        calendar: "gregory",
+        numberingSystem: "latn",
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function detectedTimezone() {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return isValidTimezone(timezone) ? timezone : "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+function dateParts(now, timezone) {
+  const zone = timezone || detectedTimezone();
+  if (!isValidTimezone(zone)) throw new RangeError("A valid IANA timezone is required");
+  const formatter = formatters.get(zone);
+  const parts = Object.fromEntries(formatter.formatToParts(now).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 /**
- * Returns today's calendar date in local time as "YYYY-MM-DD".
- * Streaks uses local calendar dates so daily habit check-ins align with the user's local day.
+ * Returns the current calendar date in an IANA timezone as "YYYY-MM-DD".
  *
  * @param {Date} [now=new Date()]
+ * @param {string} [timezone]
  * @returns {string}
  */
-export function localToday(now = new Date()) {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+export function localToday(now = new Date(), timezone = detectedTimezone()) {
+  return dateParts(now, timezone);
+}
+
+export function nextMidnightInZone(timezone, now = new Date()) {
+  if (!isValidTimezone(timezone)) throw new RangeError("A valid IANA timezone is required");
+  const targetDate = migrationDate(localToday(now, timezone), 2);
+  const target = Date.parse(`${targetDate}T00:00:00.000Z`);
+  let low = target - 36 * 60 * 60 * 1000;
+  let high = target + 36 * 60 * 60 * 1000;
+  while (high - low > 1) {
+    const middle = Math.floor((low + high) / 2);
+    if (localToday(new Date(middle), timezone) >= targetDate) high = middle;
+    else low = middle;
+  }
+  return new Date(high);
+}
+
+export function scheduleTodayRollover({ timezone, serverTime, onRollover, now = new Date() }) {
+  const delay = serverTime
+    ? Math.max(0, serverTime.delayMs ?? Date.parse(serverTime.nextMidnightAt) - Date.parse(serverTime.serverNow))
+    : Math.max(0, nextMidnightInZone(timezone, now).getTime() - now.getTime() + 1000);
+  const timer = setTimeout(() => onRollover(), delay);
+  return () => clearTimeout(timer);
 }
 
 /**

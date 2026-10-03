@@ -14,6 +14,24 @@ export function Toast({ toast, onDismiss }) {
       style={{ cursor: "pointer" }}
     >
       {toast.message}
+      {toast.actions?.length > 0 && (
+        <span className="toast-actions">
+          {toast.actions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              className="toast-action"
+              onClick={(event) => {
+                event.stopPropagation();
+                action.onClick();
+                onDismiss();
+              }}
+            >
+              {action.label}
+            </button>
+          ))}
+        </span>
+      )}
     </div>
   );
 }

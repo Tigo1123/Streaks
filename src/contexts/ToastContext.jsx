@@ -15,13 +15,13 @@ export function ToastProvider({ children }) {
     setToast(null);
   }, []);
 
-  const showToast = useCallback((message, type = "status", duration = 3200) => {
+  const showToast = useCallback((message, type = "status", duration = 3200, actions = []) => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
 
     const id = Date.now();
-    setToast({ id, message, type });
+    setToast({ id, message, type, actions });
 
     if (duration > 0) {
       timerRef.current = setTimeout(() => {

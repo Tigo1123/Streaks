@@ -7,10 +7,12 @@ import { useToast } from "../../hooks/useToast.js";
 import { readMigrationSource, migrateLocalData } from "../../services/cloudBackup.js";
 import { ProgressBar } from "../common/ProgressBar.jsx";
 import { t } from "../../i18n/index.js";
+import { useTimezone } from "../../hooks/useTimezone.js";
 
 export function BackupModal() {
   const { user, token } = useAuth();
   const { language } = useStreaks();
+  const { today } = useTimezone();
   const { modalMode, closeModal } = useNavigation();
   const { showToast } = useToast();
 
@@ -25,7 +27,7 @@ export function BackupModal() {
   useEffect(() => {
     if (isOpen) {
       try {
-        const { counts: c } = readMigrationSource();
+        const { counts: c } = readMigrationSource(today);
         setCounts(c);
         setStep("confirm");
         setProgressState(null);
@@ -35,7 +37,7 @@ export function BackupModal() {
         setStep("confirm");
       }
     }
-  }, [isOpen]);
+  }, [isOpen, today]);
 
   const handleStartBackup = async () => {
     if (!token || !user) return;
@@ -44,6 +46,7 @@ export function BackupModal() {
     const res = await migrateLocalData({
       token,
       userId: user.id,
+      today,
       onProgress: (p) => {
         setProgressState({ ...p });
       },

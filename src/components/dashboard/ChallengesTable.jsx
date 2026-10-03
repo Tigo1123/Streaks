@@ -6,9 +6,11 @@ import { progress, status as getStatus, streakStats } from "../../utils/streakCa
 import { Badge } from "../common/Badge.jsx";
 import { ProgressBar } from "../common/ProgressBar.jsx";
 import { t } from "../../i18n/index.js";
+import { useTimezone } from "../../hooks/useTimezone.js";
 
 export function ChallengesTable() {
   const { challenges, language } = useStreaks();
+  const { today } = useTimezone();
   const { goToDetail } = useNavigation();
 
   const isRtl = language === "ar";
@@ -29,9 +31,9 @@ export function ChallengesTable() {
         <tbody>
           {challenges.map((c) => {
             const p = progress(c);
-            const s = getStatus(c);
-            const d = dayIndex(c);
-            const stats = streakStats(c);
+            const s = getStatus(c, today);
+            const d = dayIndex(c, today);
+            const stats = streakStats(c, today);
 
             const dayText = d < 1
               ? t("startFuture", { count: 1 - d }, language)

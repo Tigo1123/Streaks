@@ -7,9 +7,11 @@ import { ProgressBar } from "../common/ProgressBar.jsx";
 import { DayGrid } from "./DayGrid.jsx";
 import { NoteEditor } from "./NoteEditor.jsx";
 import { t } from "../../i18n/index.js";
+import { useTimezone } from "../../hooks/useTimezone.js";
 
 export function ChallengeDetail() {
   const { challenges, toggleCompletion, saveNote, deleteNote, language } = useStreaks();
+  const { today } = useTimezone();
   const { selectedChallengeId, goBack, openModal } = useNavigation();
   const { showToast } = useToast();
 
@@ -31,7 +33,7 @@ export function ChallengeDetail() {
   }
 
   const prog = getProgress(challenge);
-  const stats = streakStats(challenge);
+  const stats = streakStats(challenge, today);
   const completedCount = challenge.completedDays.length;
 
   const handleToggle = (day) => {
@@ -121,6 +123,7 @@ export function ChallengeDetail() {
           challenge={challenge}
           language={language}
           onToggle={handleToggle}
+          today={today}
         />
       </section>
 

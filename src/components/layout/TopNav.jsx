@@ -168,6 +168,17 @@ export function TopNav({ onToggleSidebar }) {
         {/* Language Switcher Pill */}
         <button
           type="button"
+          className="btn-icon"
+          onClick={() => openModal("timezone")}
+          aria-label={t("timezoneTitle", {}, language)}
+          title={t("timezoneTitle", {}, language)}
+          style={{ height: "34px", width: "34px" }}
+        >
+          <span aria-hidden="true">🌐</span>
+        </button>
+
+        <button
+          type="button"
           className="btn btn-secondary"
           onClick={toggleLanguage}
           aria-label={t("languageLabel", {}, language)}

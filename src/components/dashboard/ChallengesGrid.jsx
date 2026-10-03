@@ -5,9 +5,11 @@ import { dayIndex } from "../../utils/date.js";
 import { progress, status as getStatus, streakStats } from "../../utils/streakCalculations.js";
 import { ProgressBar } from "../common/ProgressBar.jsx";
 import { t } from "../../i18n/index.js";
+import { useTimezone } from "../../hooks/useTimezone.js";
 
 export function ChallengesGrid() {
   const { challenges, language } = useStreaks();
+  const { today } = useTimezone();
   const { openChallenge } = useNavigation();
 
   const isRtl = language === "ar";
@@ -16,9 +18,9 @@ export function ChallengesGrid() {
     <section className="cards-grid" aria-label={t("challengeCount", { count: challenges.length }, language)}>
       {challenges.map((c) => {
         const p = progress(c);
-        const s = getStatus(c);
-        const d = dayIndex(c);
-        const stats = streakStats(c);
+        const s = getStatus(c, today);
+        const d = dayIndex(c, today);
+        const stats = streakStats(c, today);
 
         const isDoneToday = d >= 1 && d <= c.durationDays && c.completedDays.includes(d);
         const isCompletedChallenge = p === 100;

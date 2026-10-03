@@ -3,12 +3,14 @@ import { runCloudSync, syncErrorKey, readSyncMetadata } from "../services/sync.j
 import { readMigrationSource, migrationStore } from "../services/cloudBackup.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { useStreaks } from "../hooks/useStreaks.js";
+import { useTimezone } from "../hooks/useTimezone.js";
 
 export const SyncContext = createContext(null);
 
 export function SyncProvider({ children }) {
   const { token, user, isAuthenticated, logout } = useAuth();
   const { reloadFromStorage } = useStreaks();
+  const { today, ensureServerTimezone, refreshServerTime, acceptServerTime, adoptServerTimezone } = useTimezone();
 
   const [status, setStatus] = useState("idle"); // "idle" | "syncing" | "conflict" | "success" | "error" | "offline"
   const [isRunning, setIsRunning] = useState(false);
@@ -60,16 +62,19 @@ export function SyncProvider({ children }) {
     abortControllerRef.current = new AbortController();
 
     try {
+      await ensureServerTimezone();
+      await refreshServerTime();
       const outcome = await runCloudSync({
         token,
         userId: user.id,
         decisions: customDecisions,
         signal: abortControllerRef.current.signal,
-        readMigrationSourceFn: readMigrationSource,
+        readMigrationSourceFn: () => readMigrationSource(today),
         migrationStoreFn: migrationStore
       });
 
       if (outcome.status === "conflict") {
+        adoptServerTimezone(outcome.timezone, outcome.time);
         setConflicts(outcome.conflicts);
         setConflictIndex(0);
         setStatus("conflict");
@@ -80,6 +85,8 @@ export function SyncProvider({ children }) {
       // Success: reload fresh state into StreaksContext
       reloadFromStorage();
       setLastSyncedAt(outcome.lastSyncedAt);
+      adoptServerTimezone(outcome.timezone, outcome.time);
+      acceptServerTime(outcome.time);
       setResultKey("syncComplete");
       setResultCounts(outcome.counts);
       setStatus("success");
@@ -97,7 +104,7 @@ export function SyncProvider({ children }) {
       setIsRunning(false);
       abortControllerRef.current = null;
     }
-  }, [isRunning, isAuthenticated, token, user?.id, decisions, reloadFromStorage, logout]);
+  }, [isRunning, isAuthenticated, token, user?.id, decisions, reloadFromStorage, logout, ensureServerTimezone, refreshServerTime, acceptServerTime, adoptServerTimezone, today]);
 
   const resolveConflict = useCallback((key, side) => {
     if (!["local", "cloud"].includes(side)) return;

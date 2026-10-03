@@ -8,6 +8,7 @@ import { AuthModal } from "./components/modals/AuthModal.jsx";
 import { BackupModal } from "./components/modals/BackupModal.jsx";
 import { SyncConflictModal } from "./components/modals/SyncConflictModal.jsx";
 import { ImportExportModal } from "./components/modals/ImportExportModal.jsx";
+import { TimezoneModal } from "./components/modals/TimezoneModal.jsx";
 import { StorageRecoveryScreen } from "./components/common/StorageRecoveryScreen.jsx";
 import { useStreaks } from "./hooks/useStreaks.js";
 import { useNavigation } from "./hooks/useNavigation.js";
@@ -56,6 +57,7 @@ export function App() {
       <BackupModal />
       <SyncConflictModal />
       <ImportExportModal />
+      <TimezoneModal />
     </>
   );
 }

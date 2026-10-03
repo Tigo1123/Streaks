@@ -10,7 +10,7 @@ export const MIGRATION_KEY = "streaks-cloud-migration-v1";
  *
  * @returns {{ raw: string | null, source: any, counts: { challenges: number, completions: number, notes: number } }}
  */
-export function readMigrationSource() {
+export function readMigrationSource(today = localToday()) {
   let raw;
   try {
     raw = localStorage.getItem(STORAGE_KEY);
@@ -66,7 +66,7 @@ export function readMigrationSource() {
 
     for (const offset of c.completedDays) {
       const date = migrationDate(c.startDate, offset);
-      if (!validDate(date) || date > localToday() || date > new Date().toISOString().slice(0, 10)) {
+      if (!validDate(date) || date > migrationDate(today, 2)) {
         bad("cloudCompletionInvalid");
       }
       completions++;
@@ -157,10 +157,10 @@ export function migrationFailureKey(error) {
 /**
  * Performs one-way backup of local challenges, completions, notes, and preferences to the cloud.
  */
-export async function migrateLocalData({ token, userId, onProgress }) {
+export async function migrateLocalData({ token, userId, onProgress, today = localToday() }) {
   if (!token || !userId) throw new Error("Missing authentication credentials");
 
-  const validated = readMigrationSource();
+  const validated = readMigrationSource(today);
   const source = validated.source;
   const counts = validated.counts;
 

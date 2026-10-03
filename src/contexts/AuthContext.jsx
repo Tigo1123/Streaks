@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback, useRef } from "react";
 import { readAuthToken, saveAuthToken, clearAuthToken, validAuthUser } from "../services/authStorage.js";
 import { authRequest } from "../services/api.js";
+import { detectedTimezone, isValidTimezone } from "../utils/date.js";
 
 export const AuthContext = createContext(null);
 
@@ -8,16 +9,34 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState("loading"); // "loading" | "authenticated" | "unauthenticated" | "backendUnavailable"
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  const [time, setTime] = useState(null);
   const [noticeKey, setNoticeKey] = useState(null);
   const [formErrorKey, setFormErrorKey] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const authOperationRef = useRef(0);
 
+  const ensureTimezone = useCallback(async (nextUser, accessToken, initialTime) => {
+    if (isValidTimezone(nextUser.timezone)) return { user: nextUser, time: initialTime || null };
+    const result = await authRequest("/api/preferences", {
+      method: "PATCH",
+      token: accessToken,
+      body: { timezone: detectedTimezone() }
+    });
+    if (!result.response.ok || !isValidTimezone(result.payload?.preferences?.timezone)) {
+      throw new Error("timezoneSaveFailed");
+    }
+    return {
+      user: { ...nextUser, timezone: result.payload.preferences.timezone },
+      time: result.payload.time || initialTime || null
+    };
+  }, []);
+
   const restoreSession = useCallback(async () => {
     const savedToken = readAuthToken();
     setToken(savedToken);
     setUser(null);
+    setTime(null);
     setNoticeKey(null);
 
     if (!savedToken) {
@@ -41,8 +60,11 @@ export function AuthProvider({ children }) {
       } else if (!response.ok || !validAuthUser(payload?.user)) {
         setStatus("backendUnavailable");
       } else {
+        const resolved = await ensureTimezone(payload.user, savedToken, payload.time);
+        if (currentOp !== authOperationRef.current) return;
         setStatus("authenticated");
-        setUser(payload.user);
+        setUser(resolved.user);
+        setTime(resolved.time);
         setToken(savedToken);
       }
     } catch (_) {
@@ -50,7 +72,7 @@ export function AuthProvider({ children }) {
         setStatus("backendUnavailable");
       }
     }
-  }, []);
+  }, [ensureTimezone]);
 
   useEffect(() => {
     restoreSession();
@@ -78,13 +100,16 @@ export function AuthProvider({ children }) {
       }
 
       if (typeof payload?.token === "string" && validAuthUser(payload.user)) {
+        const resolved = await ensureTimezone(payload.user, payload.token, payload.time);
+        if (currentOp !== authOperationRef.current) return { success: false };
         saveAuthToken(payload.token);
         setToken(payload.token);
-        setUser(payload.user);
+        setUser(resolved.user);
+        setTime(resolved.time);
         setStatus("authenticated");
         setFormErrorKey(null);
         setNoticeKey(null);
-        return { success: true, user: payload.user, token: payload.token };
+        return { success: true, user: resolved.user, token: payload.token };
       }
 
       setStatus("backendUnavailable");
@@ -101,7 +126,7 @@ export function AuthProvider({ children }) {
         setIsSubmitting(false);
       }
     }
-  }, []);
+  }, [ensureTimezone]);
 
   const register = useCallback(async (email, password) => {
     setIsSubmitting(true);
@@ -142,13 +167,16 @@ export function AuthProvider({ children }) {
       }
 
       if (typeof loginResult.payload?.token === "string" && validAuthUser(loginResult.payload.user)) {
+        const resolved = await ensureTimezone(loginResult.payload.user, loginResult.payload.token, loginResult.payload.time);
+        if (currentOp !== authOperationRef.current) return { success: false };
         saveAuthToken(loginResult.payload.token);
         setToken(loginResult.payload.token);
-        setUser(loginResult.payload.user);
+        setUser(resolved.user);
+        setTime(resolved.time);
         setStatus("authenticated");
         setFormErrorKey(null);
         setNoticeKey(null);
-        return { success: true, user: loginResult.payload.user, token: loginResult.payload.token };
+        return { success: true, user: resolved.user, token: loginResult.payload.token };
       }
 
       setNoticeKey("authRegistrationNeedsLogin");
@@ -170,17 +198,23 @@ export function AuthProvider({ children }) {
         setIsSubmitting(false);
       }
     }
-  }, []);
+  }, [ensureTimezone]);
 
   const logout = useCallback(() => {
     ++authOperationRef.current;
     clearAuthToken();
     setToken(null);
     setUser(null);
+    setTime(null);
     setStatus("unauthenticated");
     setNoticeKey(null);
     setFormErrorKey(null);
     setIsSubmitting(false);
+  }, []);
+
+  const updateUserTimezone = useCallback((timezone, nextTime = null) => {
+    setUser((current) => current ? { ...current, timezone } : current);
+    if (nextTime) setTime(nextTime);
   }, []);
 
   const clearErrors = useCallback(() => {
@@ -195,12 +229,14 @@ export function AuthProvider({ children }) {
     isBackendUnavailable: status === "backendUnavailable",
     token,
     user,
+    time,
     noticeKey,
     formErrorKey,
     isSubmitting,
     login,
     register,
     logout,
+    updateUserTimezone,
     restoreSession,
     clearErrors
   };

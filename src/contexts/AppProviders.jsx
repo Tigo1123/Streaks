@@ -2,6 +2,7 @@ import React from "react";
 import { ToastProvider } from "./ToastContext.jsx";
 import { AuthProvider } from "./AuthContext.jsx";
 import { StreaksProvider } from "./StreaksContext.jsx";
+import { TimezoneProvider } from "./TimezoneContext.jsx";
 import { SyncProvider } from "./SyncContext.jsx";
 import { NavigationProvider } from "./NavigationContext.jsx";
 
@@ -10,11 +11,13 @@ export function AppProviders({ children }) {
     <ToastProvider>
       <AuthProvider>
         <StreaksProvider>
-          <SyncProvider>
-            <NavigationProvider>
-              {children}
-            </NavigationProvider>
-          </SyncProvider>
+          <TimezoneProvider>
+            <SyncProvider>
+              <NavigationProvider>
+                {children}
+              </NavigationProvider>
+            </SyncProvider>
+          </TimezoneProvider>
         </StreaksProvider>
       </AuthProvider>
     </ToastProvider>

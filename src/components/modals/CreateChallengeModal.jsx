@@ -1,24 +1,31 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Modal } from "../common/Modal.jsx";
 import { useStreaks } from "../../hooks/useStreaks.js";
 import { useNavigation } from "../../hooks/useNavigation.js";
 import { useToast } from "../../hooks/useToast.js";
-import { localToday } from "../../utils/date.js";
 import { t } from "../../i18n/index.js";
+import { useTimezone } from "../../hooks/useTimezone.js";
 
 export function CreateChallengeModal() {
   const { createChallenge, language } = useStreaks();
+  const { today } = useTimezone();
   const { modalMode, closeModal } = useNavigation();
   const { showToast } = useToast();
 
   const [name, setName] = useState("");
   const [durationPreset, setDurationPreset] = useState("30");
   const [customDuration, setCustomDuration] = useState("");
-  const [startDate, setStartDate] = useState(localToday());
+  const [startDate, setStartDate] = useState(today);
   const [error, setError] = useState("");
+  const wasOpen = useRef(false);
 
   const isOpen = modalMode === "create";
   const isRtl = language === "ar";
+
+  useEffect(() => {
+    if (isOpen && !wasOpen.current) setStartDate(today);
+    wasOpen.current = isOpen;
+  }, [isOpen, today]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -40,7 +47,7 @@ export function CreateChallengeModal() {
     const result = createChallenge({
       name: trimmedName,
       durationDays,
-      startDate: startDate || localToday(),
+      startDate: startDate || today,
     });
 
     if (!result.ok) return;
@@ -49,7 +56,7 @@ export function CreateChallengeModal() {
     setName("");
     setDurationPreset("30");
     setCustomDuration("");
-    setStartDate(localToday());
+    setStartDate(today);
     setError("");
     closeModal();
   };

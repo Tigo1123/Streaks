@@ -21,6 +21,10 @@ Add a Rewrite rule so client-side navigation paths return the SPA entry point:
 
 Your data stays in localStorage on each device and browser.
 
+## Time zones and date trust
+
+Each account stores an IANA time zone. When the account service is reachable, the app uses the server's current time converted to that zone; without an account or while offline, it converts the device clock to the selected zone. Local-only completion data is not protected against someone changing the device clock. When syncing, the server rejects newly submitted completions later than tomorrow in the account's time zone; existing completions are not rejected solely because their date is now in the future.
+
 ## Accounts and local data
 
 Streaks has an optional account interface for registration, login, session checks, and logout. The account API uses the independent Express/PostgreSQL backend in [`server/`](server/README.md). Challenge data, notes, completions, reminders, language, Import/Export, and offline operation remain local to this browser. Logging out only clears the account token; it does not alter local Streaks data.
@@ -73,7 +77,7 @@ Streaks includes manual two-way cloud synchronization for authenticated accounts
   - Local challenge deleted while cloud unchanged → deleted in cloud.
   - Deletions are tracked via user-scoped durable tombstones (`sync_tombstones`) to prevent stale resurrection.
   - Completion additions and removals are synchronized across devices.
-  - Notes and user preferences (language, reminders enabled) are synchronized.
+  - Notes and user preferences (language, reminders enabled) are synchronized. The account's time zone remains server-authoritative.
 - **Account-scoped metadata:** Stored under a separate `streaks-cloud-sync-v1` `localStorage` key. The core `streaks-data` schema remains untouched.
 - **Safety & Idempotency:** Re-reads `streaks-data` before applying cloud changes to detect concurrent local edits. Running sync multiple times with no modifications produces no writes. Partial network failures preserve successful operations and allow safe retry.
 

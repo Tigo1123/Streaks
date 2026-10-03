@@ -1,4 +1,4 @@
-import { migrationDate, offsetForDate, validDate, dateValue, DAY_MS } from "../utils/date.js";
+import { detectedTimezone, isValidTimezone, migrationDate, offsetForDate, validDate, dateValue, DAY_MS } from "../utils/date.js";
 import { authRequest } from "./api.js";
 import { isApplyingSyncState, setApplyingSyncState, STORAGE_KEY } from "./storage.js";
 
@@ -74,7 +74,10 @@ export async function syncNoteHash(note) {
  */
 export function validateCloudSnapshot(snapshot) {
   if (!snapshot || !Array.isArray(snapshot.challenges) || !Array.isArray(snapshot.completions) ||
-      !Array.isArray(snapshot.notes) || !Array.isArray(snapshot.tombstones) || !snapshot.preferences) {
+      !Array.isArray(snapshot.notes) || !Array.isArray(snapshot.tombstones) || !snapshot.preferences ||
+      !snapshot.time || !validDate(snapshot.time.today) ||
+      !Number.isFinite(Date.parse(snapshot.time.serverNow)) ||
+      !Number.isFinite(Date.parse(snapshot.time.nextMidnightAt))) {
     throw new Error("syncInvalid");
   }
 
@@ -98,7 +101,8 @@ export function validateCloudSnapshot(snapshot) {
     }
     const challenge = snapshot.challenges.find((c) => c.id === item.challengeId);
     const offset = offsetForDate(challenge.startDate, item.completionDate);
-    if (offset < 1 || offset > challenge.duration || item.completionDate > new Date().toISOString().slice(0, 10)) {
+    const latestAllowedDate = migrationDate(snapshot.time.today, 2);
+    if (offset < 1 || offset > challenge.duration || item.completionDate > latestAllowedDate) {
       throw new Error("syncInvalid");
     }
     const key = `${item.challengeId}|${item.completionDate}`;
@@ -131,6 +135,7 @@ export function validateCloudSnapshot(snapshot) {
 
   if (!["en", "ar"].includes(snapshot.preferences.language) ||
       typeof snapshot.preferences.remindersEnabled !== "boolean" ||
+      (snapshot.preferences.timezone !== null && !isValidTimezone(snapshot.preferences.timezone)) ||
       (snapshot.preferences.updatedAt !== null && !Number.isFinite(Date.parse(snapshot.preferences.updatedAt)))) {
     throw new Error("syncInvalid");
   }
@@ -782,6 +787,16 @@ export async function runCloudSync({
   const me = await authRequest("/api/auth/me", { token, signal });
   if (me.response.status === 401) throw syncApiError(401);
   if (!me.response.ok || me.payload?.user?.id !== userId) throw new Error("syncInvalid");
+  if (me.payload.user.timezone === null) {
+    const timezone = detectedTimezone();
+    const setTimezone = await authRequest("/api/preferences", {
+      method: "PATCH",
+      token,
+      body: { timezone },
+      signal
+    });
+    if (!setTimezone.response.ok) throw syncApiError(setTimezone.response.status);
+  }
 
   // 2. Read local state and cloud snapshot
   const local = readMigrationSourceFn ? readMigrationSourceFn() : { raw: localStorage.getItem(STORAGE_KEY), source: JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") };
@@ -801,7 +816,9 @@ export async function runCloudSync({
     return {
       status: "conflict",
       conflicts: unresolved,
-      plan
+      plan,
+      time: response.payload.time,
+      timezone: response.payload.preferences.timezone
     };
   }
 
@@ -1014,6 +1031,8 @@ export async function runCloudSync({
       conflicts: Object.keys(decisions).length
     },
     nextState: plan.nextState,
-    lastSyncedAt: account.lastSyncedAt
+    lastSyncedAt: account.lastSyncedAt,
+    time: final.payload.time,
+    timezone: final.payload.preferences.timezone
   };
 }

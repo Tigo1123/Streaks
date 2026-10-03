@@ -3,9 +3,11 @@ import { useStreaks } from "../../hooks/useStreaks.js";
 import { status as getStatus, streakStats } from "../../utils/streakCalculations.js";
 import { dayIndex } from "../../utils/date.js";
 import { t } from "../../i18n/index.js";
+import { useTimezone } from "../../hooks/useTimezone.js";
 
 export function StatCards() {
   const { challenges, language } = useStreaks();
+  const { today } = useTimezone();
   const isRtl = language === "ar";
 
   let activeCount = 0;
@@ -17,12 +19,12 @@ export function StatCards() {
   let todayDoneCount = 0;
 
   for (const c of challenges) {
-    const s = getStatus(c);
+    const s = getStatus(c, today);
     if (s === "active") activeCount++;
     totalCompletedDays += c.completedDays.length;
     totalChallengeDays += c.durationDays;
 
-    const stats = streakStats(c);
+    const stats = streakStats(c, today);
     if (stats.longest > bestStreak) {
       bestStreak = stats.longest;
     }
@@ -30,7 +32,7 @@ export function StatCards() {
       currentTopStreak = stats.current;
     }
 
-    const d = dayIndex(c);
+    const d = dayIndex(c, today);
     if (d >= 1 && d <= c.durationDays) {
       todayDueCount++;
       if (c.completedDays.includes(d)) {

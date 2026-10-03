@@ -2,15 +2,15 @@ import React from "react";
 import { dayIndex } from "../../utils/date.js";
 import { t } from "../../i18n/index.js";
 
-export function DayGrid({ challenge, language, onToggle }) {
-  const today = dayIndex(challenge);
+export function DayGrid({ challenge, language, onToggle, today }) {
+  const day = dayIndex(challenge, today);
   const totalDays = challenge.durationDays;
 
   const days = Array.from({ length: totalDays }, (_, i) => {
     const n = i + 1;
     const done = challenge.completedDays.includes(n);
-    const future = n > today;
-    const isToday = n === today;
+    const future = n > day;
+    const isToday = n === day;
 
     const label = future
       ? t("future", { day: n }, language)

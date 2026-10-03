@@ -4,9 +4,11 @@ import { useNavigation } from "../../hooks/useNavigation.js";
 import { dayIndex } from "../../utils/date.js";
 import { progress, streakStats } from "../../utils/streakCalculations.js";
 import { t } from "../../i18n/index.js";
+import { useTimezone } from "../../hooks/useTimezone.js";
 
 export function TodayActionPanel() {
   const { challenges, toggleCompletion, language } = useStreaks();
+  const { today } = useTimezone();
   const { openChallenge } = useNavigation();
 
   // State to trigger momentary celebration animation when a challenge is checked
@@ -16,11 +18,11 @@ export function TodayActionPanel() {
 
   const todayChallenges = challenges
     .map((c) => {
-      const day = dayIndex(c);
+      const day = dayIndex(c, today);
       const isDueToday = day >= 1 && day <= c.durationDays;
       const isDoneToday = isDueToday && c.completedDays.includes(day);
       const prog = progress(c);
-      const stats = streakStats(c);
+      const stats = streakStats(c, today);
       return {
         challenge: c,
         day,
