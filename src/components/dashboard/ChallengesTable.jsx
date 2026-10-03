@@ -4,7 +4,7 @@ import { useNavigation } from "../../hooks/useNavigation.js";
 import { dayIndex } from "../../utils/date.js";
 import { progress, status as getStatus, streakStats } from "../../utils/streakCalculations.js";
 import { Badge } from "../common/Badge.jsx";
-import { ProgressBar } from "../common/ProgressBar.jsx";
+import { ProgressRing } from "../common/ProgressRing.jsx";
 import { t } from "../../i18n/index.js";
 import { useTimezone } from "../../hooks/useTimezone.js";
 
@@ -56,14 +56,12 @@ export function ChallengesTable() {
                   <Badge status={s} />
                 </td>
                 <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <div style={{ flex: 1 }}>
-                      <ProgressBar value={p} />
-                    </div>
-                    <span style={{ fontSize: "0.8rem", fontWeight: 600, minWidth: "36px" }}>
-                      {p}%
-                    </span>
-                  </div>
+                  <ProgressRing
+                    value={p}
+                    label={isRtl ? `تقدم ${c.name}` : `${c.name} progress`}
+                    size={48}
+                    className="progress-ring-table"
+                  />
                 </td>
                 <td>
                   <span style={{ fontWeight: 600 }}>🔥 {stats.current}</span>

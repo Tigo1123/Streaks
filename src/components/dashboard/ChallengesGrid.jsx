@@ -3,7 +3,7 @@ import { useStreaks } from "../../hooks/useStreaks.js";
 import { useNavigation } from "../../hooks/useNavigation.js";
 import { dayIndex } from "../../utils/date.js";
 import { progress, status as getStatus, streakStats } from "../../utils/streakCalculations.js";
-import { ProgressBar } from "../common/ProgressBar.jsx";
+import { ProgressRing } from "../common/ProgressRing.jsx";
 import { t } from "../../i18n/index.js";
 import { useTimezone } from "../../hooks/useTimezone.js";
 
@@ -76,13 +76,14 @@ export function ChallengesGrid() {
             {/* Middle: Title Dominates */}
             <h3 className="challenge-card-title">{c.name}</h3>
 
-            {/* Progress Bar & Percentage */}
             <div className="challenge-card-progress-zone">
-              <div className="progress-label-row">
-                <span className="progress-tag">{isRtl ? "التقدم" : "Progress"}</span>
-                <span className="progress-number">{p}%</span>
-              </div>
-              <ProgressBar value={p} height={8} />
+              <span className="progress-tag">{isRtl ? "التقدم" : "Progress"}</span>
+              <ProgressRing
+                value={p}
+                label={isRtl ? `تقدم ${c.name}` : `${c.name} progress`}
+                size={68}
+                className="progress-ring-card"
+              />
             </div>
 
             {/* Bottom: Day Count & Continue Action */}

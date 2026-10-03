@@ -214,3 +214,29 @@ test("Phase 5 - Dark Design System Token Integrity", () => {
   assert.ok(serviceWorker.includes('streaks-shell-v7'), "Service worker shell cache version was advanced");
   assert.ok(serviceWorker.includes('fonts/manrope-latin.woff2'), "Self-hosted fonts are cached for offline use");
 });
+
+test("Phase 6 - Dashboard progress rings are accessible and shared across cards", () => {
+  const ring = fs.readFileSync(path.join(projectRoot, "src/components/common/ProgressRing.jsx"), "utf8");
+  const statCards = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/StatCards.jsx"), "utf8");
+  const todayPanel = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/TodayActionPanel.jsx"), "utf8");
+  const challengeGrid = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/ChallengesGrid.jsx"), "utf8");
+  const challengeTable = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/ChallengesTable.jsx"), "utf8");
+  const styles = fs.readFileSync(path.join(projectRoot, "src/styles/components.css"), "utf8");
+  const variables = fs.readFileSync(path.join(projectRoot, "src/styles/variables.css"), "utf8");
+
+  assert.ok(ring.includes('role="img"'), "Progress ring exposes an image role");
+  assert.ok(ring.includes("aria-label="), "Progress ring has a text alternative");
+  assert.ok(ring.includes("strokeDashoffset={offset}"), "Progress ring maps the bounded percentage to its stroke");
+  for (const [name, source] of [
+    ["StatCards", statCards],
+    ["TodayActionPanel", todayPanel],
+    ["ChallengesGrid", challengeGrid],
+    ["ChallengesTable", challengeTable]
+  ]) {
+    assert.ok(source.includes("<ProgressRing"), `${name} uses the shared progress ring`);
+  }
+  assert.ok(styles.includes(".progress-ring-outer"), "Ring includes a separate gradient outer stroke");
+  assert.ok(styles.includes(".progress-ring-inner-track"), "Ring includes an inner progress track");
+  assert.ok(styles.includes("font-variant-numeric: tabular-nums;"), "Ring values use stable, readable numerals");
+  assert.ok(variables.includes("--color-primary: #a18cff;"), "Dashboard text accent meets contrast on the dark canvas");
+});

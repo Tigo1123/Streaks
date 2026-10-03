@@ -70,9 +70,9 @@
   --border-hover: rgba(255, 255, 255, 0.2);
   --border-focus: #a18cff;
 
-  --color-primary: var(--color-accent-violet);
-  --color-primary-hover: #9b86ff;
-  --color-primary-active: #6948e8;
+  --color-primary: #a18cff;
+  --color-primary-hover: #b2a2ff;
+  --color-primary-active: #8d74f2;
   --color-primary-subtle: rgba(123, 92, 255, 0.16);
   --color-primary-text: #d8ceff;
   --gradient-accent: linear-gradient(135deg, var(--color-accent-violet), var(--color-accent-blue));

@@ -4,6 +4,7 @@ import { status as getStatus, streakStats } from "../../utils/streakCalculations
 import { dayIndex } from "../../utils/date.js";
 import { t } from "../../i18n/index.js";
 import { useTimezone } from "../../hooks/useTimezone.js";
+import { ProgressRing } from "../common/ProgressRing.jsx";
 
 export function StatCards() {
   const { challenges, language } = useStreaks();
@@ -49,11 +50,9 @@ export function StatCards() {
 
   return (
     <section className="momentum-overview-container" aria-label={isRtl ? "ملخص الزخم والسلاسل" : "Momentum Overview"}>
-      {/* Integrated Hero Momentum Card */}
       <article className="stat-card momentum-hero-card">
         <div className="momentum-card-left">
           <div className="momentum-header-tag">
-            <span className="momentum-flame-icon" aria-hidden="true">🔥</span>
             <span className="momentum-tag-label">{isRtl ? "سلسلة الإنجاز الحالية" : "CURRENT STREAK"}</span>
             <span className="momentum-best-badge">
               ★ {isRtl ? `الأفضل: ${bestStreak} يوم` : `Best: ${bestStreak} days`}
@@ -73,31 +72,20 @@ export function StatCards() {
           </div>
         </div>
 
-        {/* Playful Secondary Motivation Pods */}
         <div className="momentum-pods-row">
-          {/* Today's Focus Pod with Ring */}
-          <div className="momentum-pod">
-            <div className="pod-circular-progress">
-              <svg viewBox="0 0 36 36" className="circular-chart" aria-hidden="true">
-                <path
-                  className="circle-bg"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="circle-fill"
-                  strokeDasharray={`${todayPercent}, 100`}
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <span className="pod-center-icon">⚡</span>
-            </div>
+          <div className="momentum-pod momentum-today-pod">
+            <ProgressRing
+              value={todayPercent}
+              label={isRtl ? "إنجاز اليوم" : "Today's completion"}
+              size={104}
+              className="progress-ring-hero"
+            />
             <div className="pod-text-wrap">
               <span className="pod-value">{todayDueCount > 0 ? `${todayDoneCount}/${todayDueCount}` : "0"}</span>
               <span className="pod-label">{isRtl ? "مهام اليوم" : "Today"}</span>
             </div>
           </div>
 
-          {/* Active Habits Pod */}
           <div className="momentum-pod">
             <div className="pod-badge-avatar">🎯</div>
             <div className="pod-text-wrap">
@@ -106,7 +94,6 @@ export function StatCards() {
             </div>
           </div>
 
-          {/* Consistency Pod */}
           <div className="momentum-pod">
             <div className="pod-badge-avatar">📈</div>
             <div className="pod-text-wrap">

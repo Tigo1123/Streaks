@@ -1587,3 +1587,358 @@ html[dir="rtl"] .dashboard-table {
   border-bottom: 1px solid var(--border-card);
   color: var(--text-primary);
 }
+
+/* --------------------------------------------------------------------------
+   Phase 6 · Batch 2: dashboard cards and accessible progress rings
+   -------------------------------------------------------------------------- */
+.progress-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  isolation: isolate;
+}
+
+.progress-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.progress-ring-outer-track,
+.progress-ring-inner-track,
+.progress-ring-outer,
+.progress-ring-inner {
+  fill: none;
+}
+
+.progress-ring-outer-track {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1.5;
+}
+
+.progress-ring-outer {
+  stroke-width: 1.5;
+}
+
+.progress-ring-inner-track {
+  stroke: var(--color-column-inactive);
+  stroke-width: 10;
+}
+
+.progress-ring-inner {
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.progress-ring-value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}
+
+.progress-ring-hero .progress-ring-inner-track,
+.progress-ring-hero .progress-ring-inner {
+  stroke-width: 8;
+}
+
+.progress-ring-hero .progress-ring-value {
+  font-size: 1.1rem;
+}
+
+.progress-ring-compact .progress-ring-inner-track,
+.progress-ring-compact .progress-ring-inner {
+  stroke-width: 8;
+}
+
+.progress-ring-compact .progress-ring-value {
+  font-size: 0.7rem;
+}
+
+.progress-ring-card .progress-ring-inner-track,
+.progress-ring-card .progress-ring-inner {
+  stroke-width: 8;
+}
+
+.progress-ring-table .progress-ring-inner-track,
+.progress-ring-table .progress-ring-inner {
+  stroke-width: 7;
+}
+
+.momentum-hero-card {
+  background: linear-gradient(135deg, rgba(123, 92, 255, 0.15), rgba(59, 130, 246, 0.07)), var(--bg-card);
+  border: 1px solid var(--border-card);
+  box-shadow: var(--shadow-card);
+}
+
+.dashboard-greeting,
+.momentum-huge-number {
+  font-weight: 700;
+}
+
+.dashboard-subheading {
+  font-weight: 500;
+}
+
+.momentum-pods-row {
+  gap: var(--space-3);
+}
+
+.momentum-pod {
+  min-width: 120px;
+  padding: var(--space-3);
+  background: rgba(11, 13, 26, 0.4);
+  border: 1px solid var(--border-card);
+  box-shadow: none;
+}
+
+.momentum-pod:hover {
+  transform: none;
+  border-color: var(--border-hover);
+}
+
+.momentum-today-pod {
+  flex-direction: row;
+  gap: var(--space-3);
+}
+
+.momentum-best-badge {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary-text);
+  border-color: var(--border-card);
+}
+
+.today-panel {
+  padding: var(--space-5);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+}
+
+.today-panel-heading {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.today-completion-badge {
+  background: rgba(11, 13, 26, 0.46);
+  border: 1px solid var(--border-card);
+  box-shadow: none;
+  min-height: 44px;
+}
+
+.today-celebration-banner {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.16), rgba(123, 92, 255, 0.1));
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  box-shadow: none;
+}
+
+.celebration-flame-badge {
+  background: rgba(11, 13, 26, 0.48);
+  box-shadow: none;
+}
+
+.today-item {
+  gap: var(--space-3);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+
+.today-item:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border-hover);
+}
+
+.today-item.completed {
+  background: rgba(52, 211, 153, 0.055);
+  border-color: rgba(52, 211, 153, 0.18);
+}
+
+.today-checkin-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-width: 1px;
+  border-color: var(--border-hover);
+  background: rgba(11, 13, 26, 0.42);
+}
+
+.today-checkin-btn.checked {
+  background: var(--gradient-accent);
+  box-shadow: none;
+}
+
+.today-item-title-link {
+  min-height: 44px;
+  font-weight: 700;
+}
+
+.today-streak-chip {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary-text);
+}
+
+.today-action-btn {
+  min-height: 44px;
+  padding-inline: var(--space-4);
+}
+
+.today-action-btn.due {
+  background: var(--gradient-primary-button);
+  color: var(--color-on-primary-button);
+  border: 0;
+}
+
+.today-action-btn.due:hover {
+  background: linear-gradient(135deg, #b2a2ff, #91b9ff);
+  color: var(--color-on-primary-button);
+  transform: none;
+}
+
+.today-action-btn.done {
+  border: 1px solid var(--border-card);
+}
+
+.dashboard-section-header {
+  gap: var(--space-3);
+}
+
+.dashboard-section-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.cards-grid {
+  gap: var(--space-4);
+}
+
+.challenge-card {
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  box-shadow: none;
+}
+
+.challenge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+  border-color: var(--border-hover);
+}
+
+.challenge-card:focus-visible {
+  outline-color: #b5a5ff;
+}
+
+.challenge-card.state-completed {
+  background: linear-gradient(145deg, rgba(251, 191, 36, 0.08), rgba(255, 255, 255, 0.035));
+  border-color: rgba(251, 191, 36, 0.24);
+}
+
+.challenge-card.state-done-today {
+  border-color: rgba(52, 211, 153, 0.24);
+}
+
+.card-streak-pill {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary-text);
+}
+
+.challenge-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.challenge-card-progress-zone {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 68px;
+}
+
+.challenge-card-footer {
+  border-top-width: 1px;
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+
+.dashboard-table {
+  min-width: 680px;
+}
+
+.dashboard-table th {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dashboard-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.dashboard-table td .btn {
+  min-height: 44px !important;
+}
+
+@media (max-width: 768px) {
+  .momentum-hero-card {
+    align-items: flex-start;
+  }
+
+  .momentum-card-left {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .momentum-pods-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .momentum-pod {
+    min-width: 0;
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: start;
+  }
+
+  .momentum-today-pod {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 540px) {
+  .today-panel {
+    padding: var(--space-4);
+  }
+
+  .today-item {
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .today-item-action-wrap {
+    display: none;
+  }
+
+  .challenge-card {
+    padding: var(--space-4);
+  }
+}

@@ -3,6 +3,7 @@ import { useStreaks } from "../../hooks/useStreaks.js";
 import { useNavigation } from "../../hooks/useNavigation.js";
 import { dayIndex } from "../../utils/date.js";
 import { progress, streakStats } from "../../utils/streakCalculations.js";
+import { ProgressRing } from "../common/ProgressRing.jsx";
 import { t } from "../../i18n/index.js";
 import { useTimezone } from "../../hooks/useTimezone.js";
 
@@ -147,25 +148,16 @@ export function TodayActionPanel() {
                   <span className="today-item-day">
                     {t("dayOf", { day, total: challenge.durationDays }, language)}
                   </span>
-                  <span className="today-item-progress-val">{prog}%</span>
-                </div>
-
-                {/* Animated Rounded Gradient Progress Bar */}
-                <div
-                  className="today-item-progress-track"
-                  role="progressbar"
-                  aria-valuenow={prog}
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                >
-                  <div
-                    className="today-item-progress-fill"
-                    style={{ width: `${prog}%` }}
-                  />
                 </div>
               </div>
 
-              {/* Right Action Trigger */}
+              <ProgressRing
+                value={prog}
+                label={isRtl ? `تقدم ${challenge.name}` : `${challenge.name} progress`}
+                size={56}
+                className="progress-ring-compact"
+              />
+
               <div className="today-item-action-wrap">
                 <button
                   type="button"
