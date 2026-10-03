@@ -1,4 +1,5 @@
 const express = require("express");
+const { rateLimit } = require("express-rate-limit");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../db/pool");
@@ -10,6 +11,22 @@ const router = express.Router();
 const bcryptRounds = 12;
 const timingSafeDummyHash = "$2b$12$awEq0H8rbTTlrTZZ/VJb8e0dWsd1pw8xF61emHtZvGer4rLNfzF7W";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const rateLimitMessage = { error: "Too many requests. Please try again later." };
+const registerRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rateLimitMessage
+});
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rateLimitMessage
+});
 
 function normalizeEmail(value) {
   if (typeof value !== "string") return null;
@@ -39,7 +56,7 @@ function readCredentials(body) {
   return { email, password: body.password };
 }
 
-router.post("/register", async (req, res) => {
+router.post("/register", registerRateLimit, async (req, res) => {
   const { email, password } = readCredentials(req.body);
   if (Array.from(password).length < 8 || Buffer.byteLength(password, "utf8") > 72) {
     throw new ApiError(400, "Password must be at least 8 characters and no more than 72 UTF-8 bytes");
@@ -69,7 +86,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", loginRateLimit, async (req, res) => {
   const { email, password } = readCredentials(req.body);
   if (Array.from(password).length < 1 || Buffer.byteLength(password, "utf8") > 72) {
     throw new ApiError(401, "Invalid email or password");

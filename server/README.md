@@ -96,6 +96,8 @@ Other relevant statuses are `201 Created`, `204 No Content`, and `409 Conflict`.
 
 The frontend API base URL is configured once using the `streaks-api-base-url` meta tag in the root `index.html`. An empty value uses `http://localhost:10000` on local hosts and the current origin otherwise. For a separately hosted Render API, set this meta tag to the API's public HTTPS origin (without `/api`) before publishing the static site, and include the static site's exact origin in backend `CORS_ORIGIN`. The URL is public configuration and must not contain credentials or secrets.
 
+Authentication rate limits are 20 failed login attempts per IP per 15 minutes (successful logins do not count) and 5 registration attempts per IP per hour. The API sets Express `trust proxy` to `1` for Render's single reverse-proxy hop; keep this aligned with the production proxy topology.
+
 The frontend uses the auth routes and the existing challenge, completion, note, and preference routes only after the user explicitly confirms **Back up to Cloud**. The one-way backup includes supported local challenge fields, completion dates, notes, language, and reminders enabled. Local challenge IDs/created timestamps and reminder last-fire dates have no equivalent cloud field and remain local. It validates the raw local dataset, shows counts before confirmation, scopes retry metadata to the authenticated account in a separate browser-storage key, and reports partial failures. Challenges use server-enforced per-user `migrationKey` values; duplicate completions return `409` and are treated by the client as already present. Notes and preferences use the existing upsert/patch behavior. The local dataset is never deleted or replaced.
 
 This backup does not load cloud data into the app and does not enable ongoing synchronization, conflict resolution, or an offline sync queue. **Phase 3C — Synchronization** remains future work.
@@ -104,7 +106,7 @@ This backup does not load cloud data into the app and does not enable ongoing sy
 
 `npm run migrate` applies numbered SQL files once, recording successful migrations in `schema_migrations`. Each migration and its record are committed in one transaction. The schema uses UUIDs, cascading ownership, unique completion dates, one note per challenge, normalized unique emails, `updated_at` triggers, and a partial unique index for per-user challenge migration keys.
 
-Keep `DATABASE_URL` secret. For a Render-hosted API in the same region as its database, use Render's internal database URL. For external PostgreSQL connections, use the provider's TLS-enabled URL (Render external URLs require TLS, commonly expressed with `sslmode=require`). The `pg` driver reads connection/TLS options from that URL; this project does not disable certificate checks globally.
+Keep `DATABASE_URL` secret. For a Render-hosted API in the same region as its database, use Render's internal database URL. For Supabase, obtain the CA certificate from its official SSL configuration guidance. The API enforces TLS and certificate/hostname verification. It first uses the optional `DATABASE_CA_CERT` environment variable, then `server/certs/supabase-ca.crt` if present; with neither configured, Node's default trusted CA store is used. The connection pool ignores URL `ssl`/`sslmode` overrides. Never disable certificate verification to work around certificate errors.
 
 ## Tests
 
