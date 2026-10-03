@@ -20,10 +20,6 @@ function isValidDate(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function utcToday() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function addDays(value, days) {
   const date = new Date(`${value}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
@@ -72,7 +68,8 @@ function mapNote(row) {
 function mapPreferences(row) {
   return {
     language: row.language,
-    remindersEnabled: row.reminders_enabled
+    remindersEnabled: row.reminders_enabled,
+    timezone: row.timezone ?? null
   };
 }
 
@@ -90,6 +87,5 @@ module.exports = {
   mapPreferences,
   rejectUnknown,
   requireObject,
-  utcToday,
   validateUuidParam
 };

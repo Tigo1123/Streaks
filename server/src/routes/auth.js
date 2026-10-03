@@ -6,6 +6,7 @@ const pool = require("../db/pool");
 const { config } = require("../config/env");
 const { requireAuth } = require("../middleware/auth");
 const { ApiError } = require("../utils/errors");
+const { timeContext } = require("../utils/timezone");
 
 const router = express.Router();
 const bcryptRounds = 12;
@@ -39,6 +40,7 @@ function safeUser(row) {
   return {
     id: row.id,
     email: row.email,
+    timezone: row.timezone ?? null,
     createdAt: new Date(row.created_at).toISOString()
   };
 }
@@ -69,12 +71,15 @@ router.post("/register", registerRateLimit, async (req, res) => {
     const result = await client.query(
       `INSERT INTO users (email, password_hash)
        VALUES ($1, $2)
-       RETURNING id, email, created_at`,
+       RETURNING id, email, timezone, created_at`,
       [email, passwordHash]
     );
     await client.query("INSERT INTO preferences (user_id) VALUES ($1)", [result.rows[0].id]);
     await client.query("COMMIT");
-    return res.status(201).json({ user: safeUser(result.rows[0]) });
+    return res.status(201).json({
+      user: safeUser(result.rows[0]),
+      time: timeContext(result.rows[0].timezone)
+    });
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     if (error.code === "23505" && error.constraint === "users_email_unique") {
@@ -93,7 +98,7 @@ router.post("/login", loginRateLimit, async (req, res) => {
   }
 
   const result = await pool.query(
-    "SELECT id, email, password_hash, created_at FROM users WHERE email = $1",
+    "SELECT id, email, password_hash, timezone, created_at FROM users WHERE email = $1",
     [email]
   );
   const user = result.rows[0];
@@ -105,16 +110,19 @@ router.post("/login", loginRateLimit, async (req, res) => {
     subject: user.id,
     expiresIn: "1h"
   });
-  return res.json({ token, user: safeUser(user) });
+  return res.json({ token, user: safeUser(user), time: timeContext(user.timezone) });
 });
 
 router.get("/me", requireAuth, async (req, res) => {
   const result = await pool.query(
-    "SELECT id, email, created_at FROM users WHERE id = $1",
+    "SELECT id, email, timezone, created_at FROM users WHERE id = $1",
     [req.user.id]
   );
   if (result.rowCount === 0) throw new ApiError(401, "Authentication required");
-  return res.json({ user: safeUser(result.rows[0]) });
+  return res.json({
+    user: safeUser(result.rows[0]),
+    time: timeContext(result.rows[0].timezone)
+  });
 });
 
 module.exports = { router, normalizeEmail };

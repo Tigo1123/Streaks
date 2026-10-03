@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db/pool");
 const { requireAuth } = require("../middleware/auth");
 const { mapChallenge, mapCompletion, mapNote, mapPreferences } = require("../utils/data");
+const { timeContext } = require("../utils/timezone");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -28,9 +29,12 @@ router.get("/", async (req, res) => {
       [req.user.id]
     );
     const preferenceRows = await client.query(
-      `SELECT language, reminders_enabled, updated_at FROM preferences WHERE user_id = $1`,
+      `SELECT p.language, p.reminders_enabled, p.updated_at, u.timezone
+       FROM preferences AS p JOIN users AS u ON u.id = p.user_id WHERE p.user_id = $1`,
       [req.user.id]
     );
+    const userRows = await client.query("SELECT timezone FROM users WHERE id = $1", [req.user.id]);
+    const timezone = userRows.rows[0]?.timezone ?? null;
     const tombstoneRows = await client.query(
       `SELECT entity_type, entity_key, deleted_at FROM sync_tombstones
        WHERE user_id = $1 ORDER BY deleted_at, entity_type, entity_key`,
@@ -47,7 +51,8 @@ router.get("/", async (req, res) => {
       notes: noteRows.rows.map((row) => ({ challengeId: row.challenge_id, note: mapNote(row) })),
       preferences: preferenceRows.rowCount
         ? { ...mapPreferences(preferenceRows.rows[0]), updatedAt: new Date(preferenceRows.rows[0].updated_at).toISOString() }
-        : { language: "en", remindersEnabled: false, updatedAt: null },
+        : { language: "en", remindersEnabled: false, timezone, updatedAt: null },
+      time: timeContext(timezone),
       tombstones: tombstoneRows.rows.map((row) => ({
         entityType: row.entity_type,
         entityKey: row.entity_key,

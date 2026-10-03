@@ -22,6 +22,7 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
   process.env.CORS_ORIGIN = "http://localhost:5500";
 
   const bcrypt = require("bcrypt");
+  const { todayInZone } = require("../src/utils/timezone");
   const jwt = require("jsonwebtoken");
   const app = require("../src/app");
   const pool = require("../src/db/pool");
@@ -102,7 +103,9 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
     const response = await fetch(`${baseUrl}/api/auth/me`, { headers: { authorization: `Bearer ${token}` } });
     assert.equal(response.status, 200);
     const body = await response.json();
-    assert.deepEqual(Object.keys(body.user).sort(), ["createdAt", "email", "id"]);
+    assert.deepEqual(Object.keys(body.user).sort(), ["createdAt", "email", "id", "timezone"]);
+    assert.equal(body.user.timezone, null);
+    assert.equal(body.time.today, todayInZone(null, new Date(body.time.serverNow)));
   });
 
   await t.test("schema constraints and cascades are enforced", async () => {

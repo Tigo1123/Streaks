@@ -11,9 +11,9 @@ const {
   mapNote,
   rejectUnknown,
   requireObject,
-  utcToday,
   validateUuidParam
 } = require("../utils/data");
+const { todayInZone } = require("../utils/timezone");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -78,10 +78,20 @@ async function inTransaction(operation) {
   }
 }
 
-function assertCompletionDate(challenge, completionDate) {
+function completionDateAllowed(challenge, completionDate, timezone, now = new Date()) {
   const startDate = dateString(challenge.start_date);
   const endDate = addDays(startDate, challenge.duration - 1);
-  if (completionDate < startDate || completionDate > endDate || completionDate > utcToday()) {
+  const latestAllowedDate = addDays(todayInZone(timezone, now), 1);
+  return completionDate >= startDate && completionDate <= endDate && completionDate <= latestAllowedDate;
+}
+
+function challengeRangeContainsCompletions(startDate, duration, completionDates) {
+  const endDate = addDays(startDate, duration - 1);
+  return completionDates.every((date) => date >= startDate && date <= endDate);
+}
+
+function assertCompletionDate(challenge, completionDate, timezone, now = new Date()) {
+  if (!completionDateAllowed(challenge, completionDate, timezone, now)) {
     throw new ApiError(400, "Completion date must be an elapsed day within this challenge");
   }
 }
@@ -169,10 +179,11 @@ router.patch("/:id", async (req, res) => {
        WHERE ch.id = $1 AND ch.user_id = $2`,
       [existing.id, req.user.id]
     );
-    if (completions.rows.some((row) => {
-      const date = dateString(row.completion_date);
-      return date < nextStartDate || date > addDays(nextStartDate, nextDuration - 1) || date > utcToday();
-    })) {
+    if (!challengeRangeContainsCompletions(
+      nextStartDate,
+      nextDuration,
+      completions.rows.map((row) => dateString(row.completion_date))
+    )) {
       throw new ApiError(409, "Updated challenge dates would invalidate existing completions");
     }
 
@@ -244,7 +255,9 @@ router.post("/:id/completions", async (req, res) => {
   const completion = await inTransaction(async (client) => {
     const challenge = await getOwnedChallenge(client, req.params.id, req.user.id, true);
     if (!challenge) throw new ApiError(404, "Not found");
-    assertCompletionDate(challenge, completionDate);
+    const user = await client.query("SELECT timezone FROM users WHERE id = $1", [req.user.id]);
+    if (!user.rowCount) throw new ApiError(401, "Authentication required");
+    assertCompletionDate(challenge, completionDate, user.rows[0].timezone);
     try {
       await client.query(
         `DELETE FROM sync_tombstones WHERE user_id = $1 AND entity_type = 'completion' AND entity_key = $2`,
@@ -345,3 +358,5 @@ router.delete("/:id/notes", async (req, res) => {
 });
 
 module.exports = router;
+module.exports.completionDateAllowed = completionDateAllowed;
+module.exports.challengeRangeContainsCompletions = challengeRangeContainsCompletions;
