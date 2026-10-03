@@ -39,13 +39,15 @@ export function ChallengeDetail() {
   };
 
   const handleSaveNote = (text) => {
-    saveNote(challenge.id, text);
-    showToast(t("saveNote", {}, language));
+    const result = saveNote(challenge.id, text);
+    if (result.ok) showToast(t("saved", {}, language));
+    return result.ok;
   };
 
   const handleDeleteNote = () => {
-    deleteNote(challenge.id);
-    showToast(isRtl ? "تم حذف الملاحظة" : "Note cleared");
+    const result = deleteNote(challenge.id);
+    if (result.ok) showToast(isRtl ? "تم حذف الملاحظة" : "Note cleared");
+    return result.ok;
   };
 
   return (

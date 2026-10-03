@@ -31,11 +31,12 @@ export function ImportExportModal() {
       const confirmed = window.confirm(t("importConfirm", {}, language));
       if (!confirmed) return;
 
-      importData(parsed);
+      const result = importData(parsed);
+      if (result !== true) return;
       showToast(t("importDone", {}, language));
       closeModal();
-    } catch (_) {
-      showToast(t("importBad", {}, language));
+    } catch (error) {
+      if (error?.message !== "saveFailed") showToast(t("importBad", {}, language), "danger");
     }
   };
 

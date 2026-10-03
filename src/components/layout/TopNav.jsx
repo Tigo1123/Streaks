@@ -23,8 +23,8 @@ export function TopNav({ onToggleSidebar }) {
 
   const handleReminderToggle = () => {
     if (remindersEnabled) {
-      disableReminders();
-      showToast(t("reminderOff", {}, language));
+      const result = disableReminders();
+      if (result.ok) showToast(t("reminderOff", {}, language));
     } else {
       enableReminders();
     }

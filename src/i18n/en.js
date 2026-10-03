@@ -67,6 +67,7 @@ export const en = {
   "importDone": "Data imported.",
   "saved": "Note saved",
   "saveFailed": "Could not save your changes. Your browser may have blocked local storage.",
+  "quarantinedWarning": "{count} invalid challenge(s) were excluded. The original data was saved as a backup.",
   "percent": "{percent}%",
   "startFuture": "Starts in {count} days",
   "noDays": "No days left",

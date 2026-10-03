@@ -37,11 +37,13 @@ export function CreateChallengeModal() {
       return;
     }
 
-    createChallenge({
+    const result = createChallenge({
       name: trimmedName,
       durationDays,
       startDate: startDate || localToday(),
     });
+
+    if (!result.ok) return;
 
     showToast(isRtl ? "تم إنشاء التحدي بنجاح" : "Challenge created!");
     setName("");

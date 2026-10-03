@@ -67,6 +67,7 @@ export const ar = {
   "importDone": "تم استيراد البيانات.",
   "saved": "تم حفظ الملاحظة",
   "saveFailed": "تعذر حفظ التغييرات. قد يكون المتصفح قد منع التخزين المحلي.",
+  "quarantinedWarning": "تم استبعاد {count} تحديات غير صالحة وحفظ نسخة احتياطية من البيانات الأصلية.",
   "percent": "{percent}٪",
   "startFuture": "يبدأ بعد {count} يوم",
   "noDays": "انتهت الأيام",

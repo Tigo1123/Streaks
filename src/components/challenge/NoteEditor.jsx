@@ -16,14 +16,14 @@ export function NoteEditor({ initialNote = "", onSave, onDelete, language }) {
   };
 
   const handleSave = () => {
-    onSave(text);
-    setIsDirty(false);
+    if (onSave(text)) setIsDirty(false);
   };
 
   const handleDelete = () => {
-    setText("");
-    onDelete();
-    setIsDirty(false);
+    if (onDelete()) {
+      setText("");
+      setIsDirty(false);
+    }
   };
 
   const maxLen = 1000;

@@ -24,6 +24,7 @@ import {
 } from "../src/utils/streakCalculations.js";
 import {
   STORAGE_KEY,
+  BACKUP_PREFIX,
   VERSION,
   validTimestamp,
   validChallenge,
@@ -31,6 +32,7 @@ import {
   normalizeReminders,
   load,
   persist,
+  saveRawBackup,
   isApplyingSyncState,
   setApplyingSyncState,
   createInitialState
@@ -78,10 +80,21 @@ class MockStorage {
   constructor() {
     this.store = new Map();
   }
+  get length() {
+    return this.store.size;
+  }
+  key(index) {
+    return [...this.store.keys()][index] ?? null;
+  }
   getItem(key) {
     return this.store.has(key) ? this.store.get(key) : null;
   }
   setItem(key, value) {
+    if (this.failSetItem?.(String(key), String(value))) {
+      const error = new Error("Storage quota exceeded");
+      error.name = "QuotaExceededError";
+      throw error;
+    }
     this.store.set(String(key), String(value));
   }
   removeItem(key) {
@@ -147,15 +160,17 @@ test("1. i18n Translation Dictionary Equivalence", () => {
   const vanillaEnKeys = Object.keys(vanilla.i18n.en);
   const vanillaArKeys = Object.keys(vanilla.i18n.ar);
 
-  assert.equal(enKeys.length, 183, "English key count must be 183");
-  assert.equal(arKeys.length, 183, "Arabic key count must be 183");
-  assert.equal(enKeys.length, vanillaEnKeys.length);
-  assert.equal(arKeys.length, vanillaArKeys.length);
+  assert.equal(enKeys.length, 184, "English key count must include storage recovery warning");
+  assert.equal(arKeys.length, 184, "Arabic key count must include storage recovery warning");
+  assert.equal(vanillaEnKeys.length, 183);
+  assert.equal(vanillaArKeys.length, 183);
 
-  for (const k of enKeys) {
+  for (const k of vanillaEnKeys) {
     assert.equal(en[k], vanilla.i18n.en[k], `Mismatch in EN key ${k}`);
     assert.equal(ar[k], vanilla.i18n.ar[k], `Mismatch in AR key ${k}`);
   }
+  assert.equal(typeof en.quarantinedWarning, "string");
+  assert.equal(typeof ar.quarantinedWarning, "string");
 
   // Test interpolation
   assert.equal(t("dayOf", { day: 5, total: 30 }, "en"), "Day 5 of 30");
@@ -245,11 +260,12 @@ test("3. Streak and Habit Calculation Equivalence", () => {
 test("4. Storage Service - Validation, Schema Safety, and Persistence", () => {
   localStorage.clear();
 
-  // Test load() on empty storage: MUST return clean default state and NOT write to storage
+  // Empty storage returns a successful clean default without writing.
   const initial = load();
-  assert.equal(initial.version, 1);
-  assert.equal(initial.language, "en");
-  assert.deepEqual(initial.challenges, []);
+  assert.equal(initial.ok, true);
+  assert.equal(initial.state.version, 1);
+  assert.equal(initial.state.language, "en");
+  assert.deepEqual(initial.state.challenges, []);
   assert.equal(localStorage.getItem(STORAGE_KEY), null, "load() must never write to localStorage");
 
   // Test validChallenge
@@ -278,16 +294,142 @@ test("4. Storage Service - Validation, Schema Safety, and Persistence", () => {
   };
 
   const persisted = persist(sampleState);
-  assert.equal(persisted, true);
+  assert.deepEqual(persisted, { ok: true, error: null });
   assert.ok(localStorage.getItem(STORAGE_KEY));
 
   // Reload and verify identical state
   const loaded = load();
-  assert.equal(loaded.version, 1);
-  assert.equal(loaded.language, "ar");
-  assert.equal(loaded.challenges.length, 1);
-  assert.equal(loaded.challenges[0].name, "Exercise Daily");
-  assert.equal(loaded.reminders.enabled, true);
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.state.version, 1);
+  assert.equal(loaded.state.language, "ar");
+  assert.equal(loaded.state.challenges.length, 1);
+  assert.equal(loaded.state.challenges[0].name, "Exercise Daily");
+  assert.equal(loaded.state.reminders.enabled, true);
+});
+
+test("Storage recovery preserves corrupt JSON and rejects unsupported newer versions", () => {
+  localStorage.clear();
+  const corrupt = "{not-json";
+  localStorage.setItem(STORAGE_KEY, corrupt);
+  const badJson = load();
+  assert.equal(badJson.ok, false);
+  assert.equal(badJson.error.code, "invalid-json");
+  assert.equal(badJson.raw, corrupt);
+  assert.equal(localStorage.getItem(STORAGE_KEY), corrupt);
+
+  const newer = JSON.stringify({ version: VERSION + 1, challenges: [] });
+  localStorage.setItem(STORAGE_KEY, newer);
+  const future = load();
+  assert.equal(future.ok, false);
+  assert.equal(future.error.code, "unsupported-version");
+  assert.equal(localStorage.getItem(STORAGE_KEY), newer);
+});
+
+test("Version 0 data is backed up before migration to version 1", () => {
+  localStorage.clear();
+  const legacy = JSON.stringify({
+    language: "ar",
+    challenges: [],
+    reminders: { enabled: true }
+  });
+  localStorage.setItem(STORAGE_KEY, legacy);
+
+  const result = load();
+  assert.equal(result.ok, true);
+  assert.equal(result.state.version, VERSION);
+  assert.equal(result.state.language, "ar");
+  assert.ok(localStorage.getItem(`${BACKUP_PREFIX}${Date.now()}`) === legacy ||
+    [...localStorage.store.keys()].some((key) => key.startsWith(BACKUP_PREFIX) && localStorage.getItem(key) === legacy));
+  assert.equal(JSON.parse(localStorage.getItem(STORAGE_KEY)).version, VERSION);
+});
+
+test("Backup rotation keeps three newest backups and retries quota once after removing oldest", () => {
+  localStorage.clear();
+  localStorage.setItem(`${BACKUP_PREFIX}100`, "oldest");
+  localStorage.setItem(`${BACKUP_PREFIX}200`, "middle");
+  localStorage.setItem(`${BACKUP_PREFIX}300`, "newest");
+
+  const result = saveRawBackup("fresh");
+  assert.equal(result.ok, true);
+  let keys = [...localStorage.store.keys()].filter((key) => key.startsWith(BACKUP_PREFIX));
+  assert.equal(keys.length, 3);
+  assert.equal(localStorage.getItem(`${BACKUP_PREFIX}100`), null);
+  assert.equal(localStorage.getItem(result.key), "fresh");
+
+  localStorage.clear();
+  localStorage.setItem(`${BACKUP_PREFIX}100`, "oldest");
+  localStorage.setItem(`${BACKUP_PREFIX}200`, "newest");
+  let quotaOnce = true;
+  localStorage.failSetItem = (key) => {
+    if (key.startsWith(BACKUP_PREFIX) && quotaOnce) {
+      quotaOnce = false;
+      return true;
+    }
+    return false;
+  };
+  const retried = saveRawBackup("after-quota");
+  localStorage.failSetItem = null;
+  assert.equal(retried.ok, true);
+  assert.equal(localStorage.getItem(`${BACKUP_PREFIX}100`), null);
+  assert.equal(localStorage.getItem(retried.key), "after-quota");
+});
+
+test("Migration write failure after successful backup preserves original streaks-data", () => {
+  localStorage.clear();
+  const original = JSON.stringify({ language: "en", challenges: [], reminders: { enabled: false } });
+  localStorage.setItem(STORAGE_KEY, original);
+  localStorage.failSetItem = (key) => key === STORAGE_KEY;
+
+  const result = load();
+  localStorage.failSetItem = null;
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "migration-write-failed");
+  assert.equal(localStorage.getItem(STORAGE_KEY), original);
+  assert.ok([...localStorage.store.keys()].some(
+    (key) => key.startsWith(BACKUP_PREFIX) && localStorage.getItem(key) === original
+  ));
+});
+
+test("QuotaExceeded while persisting returns an error and preserves prior data", () => {
+  localStorage.clear();
+  const original = JSON.stringify({ version: VERSION, language: "en", challenges: [], reminders: { enabled: false } });
+  localStorage.setItem(STORAGE_KEY, original);
+  localStorage.failSetItem = (key) => key === STORAGE_KEY;
+
+  const result = persist({ ...JSON.parse(original), language: "ar" });
+  localStorage.failSetItem = null;
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.name, "QuotaExceededError");
+  assert.equal(localStorage.getItem(STORAGE_KEY), original);
+});
+
+test("Invalid challenge is quarantined while two valid challenges load", () => {
+  localStorage.clear();
+  const validChallenge = (id) => ({
+    id,
+    name: id,
+    durationDays: 7,
+    startDate: "2026-10-01",
+    completedDays: [],
+    createdAt: "2026-10-01T10:00:00.000Z"
+  });
+  const raw = JSON.stringify({
+    version: VERSION,
+    language: "en",
+    challenges: [validChallenge("one"), { ...validChallenge("bad"), durationDays: 0 }, validChallenge("three")],
+    reminders: { enabled: false }
+  });
+  localStorage.setItem(STORAGE_KEY, raw);
+
+  const result = load();
+  assert.equal(result.ok, true);
+  assert.equal(result.state.challenges.length, 2);
+  assert.equal(result.quarantinedCount, 1);
+  assert.ok([...localStorage.store.keys()].some(
+    (key) => key.startsWith(BACKUP_PREFIX) && localStorage.getItem(key) === raw
+  ));
 });
 
 test("5. Auth Storage - sessionStorage Isolation", () => {

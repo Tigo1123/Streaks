@@ -11,6 +11,12 @@ class MockStorage {
   constructor() {
     this.store = new Map();
   }
+  get length() {
+    return this.store.size;
+  }
+  key(index) {
+    return [...this.store.keys()][index] ?? null;
+  }
   getItem(key) {
     return this.store.has(key) ? this.store.get(key) : null;
   }
@@ -110,14 +116,15 @@ test("Phase 4 - StreaksContext Logic & Initial Load Safety", async () => {
   const rawAfter = localStorage.getItem(STORAGE_KEY);
 
   assert.equal(rawBefore, rawAfter, "Calling load() must NOT modify or overwrite localStorage");
-  assert.equal(loaded.challenges.length, 1);
-  assert.equal(loaded.challenges[0].name, "Morning Running");
-  assert.equal(loaded.language, "ar");
-  assert.equal(loaded.reminders.enabled, true);
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.state.challenges.length, 1);
+  assert.equal(loaded.state.challenges[0].name, "Morning Running");
+  assert.equal(loaded.state.language, "ar");
+  assert.equal(loaded.state.reminders.enabled, true);
 
   // Test mutation persist
   const nextChallenges = [
-    ...loaded.challenges,
+    ...loaded.state.challenges,
     {
       id: "new-uuid-2",
       name: "Evening Reading",
@@ -127,13 +134,13 @@ test("Phase 4 - StreaksContext Logic & Initial Load Safety", async () => {
       createdAt: "2026-10-03T00:00:00.000Z"
     }
   ];
-  const nextState = { ...loaded, challenges: nextChallenges };
+  const nextState = { ...loaded.state, challenges: nextChallenges };
   const saved = persist(nextState, rawBefore);
-  assert.equal(saved, true);
+  assert.deepEqual(saved, { ok: true, error: null });
 
   const updatedLoaded = load();
-  assert.equal(updatedLoaded.challenges.length, 2);
-  assert.equal(updatedLoaded.challenges[1].name, "Evening Reading");
+  assert.equal(updatedLoaded.state.challenges.length, 2);
+  assert.equal(updatedLoaded.state.challenges[1].name, "Evening Reading");
 });
 
 test("Phase 4 - AuthContext Lifecycle & Session Safety", async () => {

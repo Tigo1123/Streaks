@@ -1,26 +1,38 @@
 import React, { createContext, useState, useCallback, useRef } from "react";
-import { load, persist, validImportChallenge, normalizeReminders, VERSION, STORAGE_KEY } from "../services/storage.js";
+import { load, persist, replaceWithInitialState, validImportChallenge, normalizeReminders, VERSION } from "../services/storage.js";
 import { migrationUuid } from "../services/sync.js";
 import { progress } from "../utils/streakCalculations.js";
 import { validDate } from "../utils/date.js";
+import { useToast } from "../hooks/useToast.js";
+import { t } from "../i18n/index.js";
 
 export const StreaksContext = createContext(null);
 
 export function StreaksProvider({ children }) {
-  // Lazy initialization directly from storage.load() ensures ZERO storage writes on mount
-  const [state, setState] = useState(() => load());
+  const [loadResult, setLoadResult] = useState(() => load());
+  const state = loadResult.state;
   const stateRef = useRef(state);
   stateRef.current = state;
+  const { showToast } = useToast();
 
   const persistState = useCallback((nextState) => {
     const previousRaw = JSON.stringify(stateRef.current);
-    const success = persist(nextState, previousRaw);
-    if (success) {
+    const result = persist(nextState, previousRaw);
+    if (result.ok) {
       stateRef.current = nextState;
-      setState(nextState);
+      setLoadResult((current) => ({
+        ...current,
+        ok: true,
+        state: nextState,
+        raw: JSON.stringify(nextState),
+        error: null,
+        quarantinedCount: 0
+      }));
+    } else {
+      showToast(t("saveFailed", {}, stateRef.current.language), "danger");
     }
-    return success;
-  }, []);
+    return result;
+  }, [showToast]);
 
   const createChallenge = useCallback(({ name, durationDays, startDate }) => {
     const trimmedName = String(name || "").trim();
@@ -47,9 +59,8 @@ export function StreaksProvider({ children }) {
       challenges: [newChallenge, ...stateRef.current.challenges]
     };
 
-    const success = persistState(nextState);
-    if (!success) throw new Error("saveFailed");
-    return newChallenge;
+    const result = persistState(nextState);
+    return { ...result, challenge: result.ok ? newChallenge : null };
   }, [persistState]);
 
   const updateChallenge = useCallback((id, updates) => {
@@ -71,7 +82,7 @@ export function StreaksProvider({ children }) {
   const toggleCompletion = useCallback((challengeId, dayNumber) => {
     const day = Number(dayNumber);
     const challenge = stateRef.current.challenges.find((c) => c.id === challengeId);
-    if (!challenge) return { success: false };
+    if (!challenge) return { ok: false, error: new Error("challenge-not-found"), success: false };
 
     const was100 = progress(challenge) === 100;
     const exists = challenge.completedDays.includes(day);
@@ -85,22 +96,23 @@ export function StreaksProvider({ children }) {
     );
 
     const nextState = { ...stateRef.current, challenges: nextChallenges };
-    const saved = persistState(nextState);
+    const result = persistState(nextState);
 
     const is100 = progress(updatedChallenge) === 100;
     return {
-      success: saved,
-      challenge: updatedChallenge,
+      ...result,
+      success: result.ok,
+      challenge: result.ok ? updatedChallenge : challenge,
       wasComplete: was100,
       isComplete: is100,
-      justCompleted: saved && !was100 && is100
+      justCompleted: result.ok && !was100 && is100
     };
   }, [persistState]);
 
   const saveNote = useCallback((challengeId, noteText) => {
     const trimmed = String(noteText || "").trim();
     const challenge = stateRef.current.challenges.find((c) => c.id === challengeId);
-    if (!challenge) return false;
+    if (!challenge) return { ok: false, error: new Error("challenge-not-found") };
 
     const updated = { ...challenge, note: trimmed };
     const nextChallenges = stateRef.current.challenges.map((c) =>
@@ -112,7 +124,7 @@ export function StreaksProvider({ children }) {
 
   const deleteNote = useCallback((challengeId) => {
     const challenge = stateRef.current.challenges.find((c) => c.id === challengeId);
-    if (!challenge) return false;
+    if (!challenge) return { ok: false, error: new Error("challenge-not-found") };
 
     const updated = { ...challenge };
     delete updated.note;
@@ -126,7 +138,7 @@ export function StreaksProvider({ children }) {
 
   const setLanguage = useCallback((lang) => {
     const normalized = lang === "ar" ? "ar" : "en";
-    if (stateRef.current.language === normalized) return true;
+    if (stateRef.current.language === normalized) return { ok: true, error: null };
 
     return persistState({
       ...stateRef.current,
@@ -178,9 +190,31 @@ export function StreaksProvider({ children }) {
     };
 
     const saved = persistState(nextState);
-    if (!saved) throw new Error("saveFailed");
+    if (!saved.ok) return saved;
     return true;
   }, [persistState]);
+
+  const retryLoad = useCallback(() => {
+    const result = load();
+    stateRef.current = result.state;
+    setLoadResult(result);
+    return result;
+  }, []);
+
+  const startFresh = useCallback(() => {
+    if (!loadResult.raw || loadResult.error?.code === "storage-unavailable") {
+      return { ok: false, error: new Error("Raw data is unavailable for safe recovery") };
+    }
+    const result = replaceWithInitialState(loadResult.raw);
+    if (!result.ok) {
+      showToast(t("saveFailed", {}, stateRef.current.language), "danger");
+      return result;
+    }
+    const fresh = load();
+    stateRef.current = fresh.state;
+    setLoadResult(fresh);
+    return result;
+  }, [loadResult, showToast]);
 
   const exportData = useCallback(() => {
     const raw = JSON.stringify(stateRef.current, null, 2);
@@ -195,14 +229,19 @@ export function StreaksProvider({ children }) {
 
   const reloadFromStorage = useCallback(() => {
     const freshlyLoaded = load();
-    stateRef.current = freshlyLoaded;
-    setState(freshlyLoaded);
+    stateRef.current = freshlyLoaded.state;
+    setLoadResult(freshlyLoaded);
   }, []);
 
   const value = {
     challenges: state.challenges,
     language: state.language,
     reminders: state.reminders,
+    loadError: loadResult.ok ? null : loadResult.error,
+    rawStorageData: loadResult.raw,
+    quarantinedCount: loadResult.quarantinedCount,
+    retryLoad,
+    startFresh,
     createChallenge,
     updateChallenge,
     deleteChallenge,

@@ -74,7 +74,8 @@ export function useReminders() {
     }
 
     const applyEnabled = () => {
-      setRemindersEnabled(true);
+      const saved = setRemindersEnabled(true);
+      if (!saved.ok) return;
       const hasPending = challenges.some((c) => {
         const day = dayIndex(c);
         return day >= 1 && day <= c.durationDays && !c.completedDays.includes(day);
@@ -106,7 +107,7 @@ export function useReminders() {
   }, [isSupported, language, challenges, setRemindersEnabled, showToast, checkReminder]);
 
   const disableReminders = useCallback(() => {
-    setRemindersEnabled(false);
+    return setRemindersEnabled(false);
   }, [setRemindersEnabled]);
 
   // Lifecycle listeners: check on foreground visibility/focus

@@ -15,7 +15,8 @@ export function DeleteChallengeModal() {
 
   const handleConfirmDelete = () => {
     if (selectedChallengeId) {
-      deleteChallenge(selectedChallengeId);
+      const result = deleteChallenge(selectedChallengeId);
+      if (!result.ok) return;
       showToast(isRtl ? "تم حذف التحدي" : "Challenge deleted");
       closeModal();
       goBack(); // return to dashboard
