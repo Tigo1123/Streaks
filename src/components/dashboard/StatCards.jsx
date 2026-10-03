@@ -1,0 +1,121 @@
+import React from "react";
+import { useStreaks } from "../../hooks/useStreaks.js";
+import { status as getStatus, streakStats } from "../../utils/streakCalculations.js";
+import { dayIndex } from "../../utils/date.js";
+import { t } from "../../i18n/index.js";
+
+export function StatCards() {
+  const { challenges, language } = useStreaks();
+  const isRtl = language === "ar";
+
+  let activeCount = 0;
+  let totalCompletedDays = 0;
+  let totalChallengeDays = 0;
+  let bestStreak = 0;
+  let currentTopStreak = 0;
+  let todayDueCount = 0;
+  let todayDoneCount = 0;
+
+  for (const c of challenges) {
+    const s = getStatus(c);
+    if (s === "active") activeCount++;
+    totalCompletedDays += c.completedDays.length;
+    totalChallengeDays += c.durationDays;
+
+    const stats = streakStats(c);
+    if (stats.longest > bestStreak) {
+      bestStreak = stats.longest;
+    }
+    if (stats.current > currentTopStreak) {
+      currentTopStreak = stats.current;
+    }
+
+    const d = dayIndex(c);
+    if (d >= 1 && d <= c.durationDays) {
+      todayDueCount++;
+      if (c.completedDays.includes(d)) {
+        todayDoneCount++;
+      }
+    }
+  }
+
+  const completionRate = totalChallengeDays > 0
+    ? Math.round((totalCompletedDays / totalChallengeDays) * 100)
+    : 0;
+
+  const todayPercent = todayDueCount > 0 ? Math.round((todayDoneCount / todayDueCount) * 100) : 0;
+
+  return (
+    <section className="momentum-overview-container" aria-label={isRtl ? "ملخص الزخم والسلاسل" : "Momentum Overview"}>
+      {/* Integrated Hero Momentum Card */}
+      <article className="stat-card momentum-hero-card">
+        <div className="momentum-card-left">
+          <div className="momentum-header-tag">
+            <span className="momentum-flame-icon" aria-hidden="true">🔥</span>
+            <span className="momentum-tag-label">{isRtl ? "سلسلة الإنجاز الحالية" : "CURRENT STREAK"}</span>
+            <span className="momentum-best-badge">
+              ★ {isRtl ? `الأفضل: ${bestStreak} يوم` : `Best: ${bestStreak} days`}
+            </span>
+          </div>
+
+          <div className="momentum-streak-number-row">
+            <span className="momentum-huge-number">{currentTopStreak}</span>
+            <div className="momentum-number-meta">
+              <span className="momentum-unit-text">{isRtl ? "أيام متتالية" : "days active"}</span>
+              <span className="momentum-encouragement">
+                {currentTopStreak > 0
+                  ? (isRtl ? "زخم رائع! واصل التقدم اليوم." : "Small actions. Big momentum.")
+                  : (isRtl ? "سجّل إنجاز اليوم لتبدأ سلسلتك!" : "Check in today to ignite your streak!")}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Playful Secondary Motivation Pods */}
+        <div className="momentum-pods-row">
+          {/* Today's Focus Pod with Ring */}
+          <div className="momentum-pod">
+            <div className="pod-circular-progress">
+              <svg viewBox="0 0 36 36" className="circular-chart" aria-hidden="true">
+                <path
+                  className="circle-bg"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="circle-fill"
+                  strokeDasharray={`${todayPercent}, 100`}
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <span className="pod-center-icon">⚡</span>
+            </div>
+            <div className="pod-text-wrap">
+              <span className="pod-value">{todayDueCount > 0 ? `${todayDoneCount}/${todayDueCount}` : "0"}</span>
+              <span className="pod-label">{isRtl ? "مهام اليوم" : "Today"}</span>
+            </div>
+          </div>
+
+          {/* Active Habits Pod */}
+          <div className="momentum-pod">
+            <div className="pod-badge-avatar">🎯</div>
+            <div className="pod-text-wrap">
+              <span className="pod-value">{activeCount}</span>
+              <span className="pod-label">{isRtl ? "تحديات نشطة" : "Active"}</span>
+            </div>
+          </div>
+
+          {/* Consistency Pod */}
+          <div className="momentum-pod">
+            <div className="pod-badge-avatar">📈</div>
+            <div className="pod-text-wrap">
+              <span className="pod-value">{completionRate}%</span>
+              <span className="pod-label">{isRtl ? "معدل الالتزام" : "Consistency"}</span>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+  );
+}
+
+export default StatCards;

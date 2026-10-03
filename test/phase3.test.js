@@ -1,0 +1,552 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+// Import migrated modules
+import { i18n, t, createTranslator } from "../src/i18n/index.js";
+import { en } from "../src/i18n/en.js";
+import { ar } from "../src/i18n/ar.js";
+import {
+  DAY_MS,
+  localToday,
+  validDate,
+  dateValue,
+  dayIndex,
+  elapsed,
+  migrationDate,
+  offsetForDate
+} from "../src/utils/date.js";
+import {
+  progress,
+  streakStats,
+  status,
+  remaining
+} from "../src/utils/streakCalculations.js";
+import {
+  STORAGE_KEY,
+  VERSION,
+  validTimestamp,
+  validChallenge,
+  validImportChallenge,
+  normalizeReminders,
+  load,
+  persist,
+  isApplyingSyncState,
+  setApplyingSyncState,
+  createInitialState
+} from "../src/services/storage.js";
+import {
+  AUTH_TOKEN_KEY,
+  readAuthToken,
+  saveAuthToken,
+  clearAuthToken,
+  validAuthUser
+} from "../src/services/authStorage.js";
+import {
+  SYNC_META_KEY,
+  SYNC_UUID_PATTERN,
+  sameSyncValue,
+  cloudFields,
+  localSyncFields,
+  completionDates,
+  syncNoteHash,
+  validateCloudSnapshot,
+  readSyncMetadata,
+  saveSyncMetadata,
+  ensureSyncAccount,
+  captureSyncMutations,
+  analyseSync
+} from "../src/services/sync.js";
+import {
+  MIGRATION_KEY,
+  readMigrationSource,
+  migrationStore,
+  saveMigrationStore
+} from "../src/services/cloudBackup.js";
+
+// Extract original Vanilla functions for 100% equivalence comparison
+const vanillaHtml = fs.readFileSync("index.vanilla.html", "utf8");
+const scriptStart = vanillaHtml.indexOf("<script>") + 8;
+const scriptEnd = vanillaHtml.lastIndexOf("</script>");
+let vanillaScript = vanillaHtml.slice(scriptStart, scriptEnd);
+if (vanillaScript.includes("// events")) {
+  vanillaScript = vanillaScript.slice(0, vanillaScript.indexOf("// events"));
+}
+
+// Setup mock window/document/localStorage/sessionStorage environment for testing
+class MockStorage {
+  constructor() {
+    this.store = new Map();
+  }
+  getItem(key) {
+    return this.store.has(key) ? this.store.get(key) : null;
+  }
+  setItem(key, value) {
+    this.store.set(String(key), String(value));
+  }
+  removeItem(key) {
+    this.store.delete(key);
+  }
+  clear() {
+    this.store.clear();
+  }
+}
+
+globalThis.localStorage = new MockStorage();
+globalThis.sessionStorage = new MockStorage();
+globalThis.window = {
+  location: { hostname: "localhost", port: "8080", origin: "http://localhost:8080", protocol: "http:" }
+};
+globalThis.location = globalThis.window.location;
+globalThis.document = {
+  querySelector: (sel) => {
+    if (sel.includes("streaks-api-base-url")) {
+      return { content: "https://streaks-api-7213.onrender.com" };
+    }
+    return null;
+  }
+};
+
+// Evaluate vanilla functions in a sandbox function
+const vanillaFn = new Function(`
+  const window = globalThis.window;
+  const document = globalThis.document;
+  const localStorage = globalThis.localStorage;
+  const sessionStorage = globalThis.sessionStorage;
+  ${vanillaScript}
+  return {
+    i18n,
+    t,
+    localToday,
+    validDate,
+    dateValue,
+    dayIndex,
+    elapsed,
+    migrationDate,
+    offsetForDate,
+    progress,
+    streakStats,
+    status,
+    remaining,
+    validTimestamp,
+    validChallenge,
+    validImportChallenge,
+    normalizeReminders,
+    sameSyncValue,
+    cloudFields,
+    localSyncFields,
+    validateCloudSnapshot
+  };
+`);
+
+const vanilla = vanillaFn();
+
+test("1. i18n Translation Dictionary Equivalence", () => {
+  const enKeys = Object.keys(en);
+  const arKeys = Object.keys(ar);
+  const vanillaEnKeys = Object.keys(vanilla.i18n.en);
+  const vanillaArKeys = Object.keys(vanilla.i18n.ar);
+
+  assert.equal(enKeys.length, 183, "English key count must be 183");
+  assert.equal(arKeys.length, 183, "Arabic key count must be 183");
+  assert.equal(enKeys.length, vanillaEnKeys.length);
+  assert.equal(arKeys.length, vanillaArKeys.length);
+
+  for (const k of enKeys) {
+    assert.equal(en[k], vanilla.i18n.en[k], `Mismatch in EN key ${k}`);
+    assert.equal(ar[k], vanilla.i18n.ar[k], `Mismatch in AR key ${k}`);
+  }
+
+  // Test interpolation
+  assert.equal(t("dayOf", { day: 5, total: 30 }, "en"), "Day 5 of 30");
+  assert.equal(t("dayOf", { day: 5, total: 30 }, "ar"), "اليوم 5 من 30");
+  assert.equal(t("percent", { percent: 75 }, "en"), "75%");
+  assert.equal(t("percent", { percent: 75 }, "ar"), "75٪");
+  assert.equal(t("nonExistentKey", {}, "en"), "nonExistentKey");
+
+  // Test createTranslator
+  const tAr = createTranslator("ar");
+  assert.equal(tAr("welcomeTitle"), "Streaks");
+  assert.equal(tAr("active"), "نشط");
+});
+
+test("2. Date Utilities Equivalence", () => {
+  assert.equal(localToday(), vanilla.localToday());
+
+  // validDate boundary tests
+  const testDates = [
+    "2026-10-03", "2024-02-29", "2023-02-29", "2026-04-30", "2026-04-31",
+    "2026-12-31", "2026-13-01", "2026-00-10", "invalid-date", "", null, undefined
+  ];
+  for (const d of testDates) {
+    assert.equal(validDate(d), vanilla.validDate(d), `validDate mismatch for: ${d}`);
+  }
+
+  // dateValue tests
+  for (const d of ["2026-01-01", "2026-06-15", "2026-12-31"]) {
+    assert.equal(dateValue(d), vanilla.dateValue(d), `dateValue mismatch for: ${d}`);
+  }
+
+  // dayIndex and elapsed tests
+  const sampleChallenges = [
+    { startDate: "2026-10-01", durationDays: 30 },
+    { startDate: "2026-10-03", durationDays: 30 },
+    { startDate: "2026-10-10", durationDays: 14 }, // future
+    { startDate: "2026-01-01", durationDays: 10 }  // past/ended
+  ];
+
+  for (const c of sampleChallenges) {
+    assert.equal(dayIndex(c), vanilla.dayIndex(c), `dayIndex mismatch for ${JSON.stringify(c)}`);
+    assert.equal(elapsed(c), vanilla.elapsed(c), `elapsed mismatch for ${JSON.stringify(c)}`);
+  }
+
+  // offsetForDate and migrationDate
+  const startDate = "2026-10-01";
+  for (let offset = 1; offset <= 30; offset++) {
+    const d = migrationDate(startDate, offset);
+    assert.equal(d, vanilla.migrationDate(startDate, offset));
+    assert.equal(offsetForDate(startDate, d), offset);
+    assert.equal(offsetForDate(startDate, d), vanilla.offsetForDate(startDate, d));
+  }
+});
+
+test("3. Streak and Habit Calculation Equivalence", () => {
+  const challenge1 = {
+    startDate: "2026-10-01",
+    durationDays: 30,
+    completedDays: [1, 2, 3]
+  };
+  const challenge2 = {
+    startDate: "2026-09-01",
+    durationDays: 30,
+    completedDays: Array.from({ length: 30 }, (_, i) => i + 1) // 100% complete
+  };
+  const challenge3 = {
+    startDate: "2026-09-20",
+    durationDays: 30,
+    completedDays: [1, 2, 4, 5, 8] // with gaps
+  };
+  const challenge4 = {
+    startDate: "2026-10-10",
+    durationDays: 7,
+    completedDays: [] // future / not started
+  };
+
+  const testCases = [challenge1, challenge2, challenge3, challenge4];
+
+  for (const c of testCases) {
+    assert.equal(progress(c), vanilla.progress(c), `progress mismatch for: ${JSON.stringify(c)}`);
+    assert.deepEqual(streakStats(c), vanilla.streakStats(c), `streakStats mismatch for: ${JSON.stringify(c)}`);
+    assert.equal(status(c), vanilla.status(c), `status mismatch for: ${JSON.stringify(c)}`);
+    assert.equal(remaining(c), vanilla.remaining(c), `remaining mismatch for: ${JSON.stringify(c)}`);
+  }
+});
+
+test("4. Storage Service - Validation, Schema Safety, and Persistence", () => {
+  localStorage.clear();
+
+  // Test load() on empty storage: MUST return clean default state and NOT write to storage
+  const initial = load();
+  assert.equal(initial.version, 1);
+  assert.equal(initial.language, "en");
+  assert.deepEqual(initial.challenges, []);
+  assert.equal(localStorage.getItem(STORAGE_KEY), null, "load() must never write to localStorage");
+
+  // Test validChallenge
+  const valid = {
+    id: "uuid-1234",
+    name: "Exercise Daily",
+    durationDays: 30,
+    startDate: "2026-10-01",
+    completedDays: [1, 2, 3],
+    createdAt: "2026-10-01T10:00:00.000Z",
+    note: "Feel great"
+  };
+  assert.equal(validChallenge(valid), true);
+  assert.equal(validChallenge({ ...valid, durationDays: 0 }), false);
+  assert.equal(validChallenge({ ...valid, durationDays: 366 }), false);
+  assert.equal(validChallenge({ ...valid, completedDays: [1, 1, 2] }), false); // duplicate
+  assert.equal(validChallenge({ ...valid, completedDays: [31] }), false); // out of range
+  assert.equal(validChallenge({ ...valid, createdAt: "2026-10-01" }), false); // not ISO UTC
+
+  // Test persistence
+  const sampleState = {
+    version: 1,
+    language: "ar",
+    challenges: [valid],
+    reminders: { enabled: true, lastReminderDate: "2026-10-03" }
+  };
+
+  const persisted = persist(sampleState);
+  assert.equal(persisted, true);
+  assert.ok(localStorage.getItem(STORAGE_KEY));
+
+  // Reload and verify identical state
+  const loaded = load();
+  assert.equal(loaded.version, 1);
+  assert.equal(loaded.language, "ar");
+  assert.equal(loaded.challenges.length, 1);
+  assert.equal(loaded.challenges[0].name, "Exercise Daily");
+  assert.equal(loaded.reminders.enabled, true);
+});
+
+test("5. Auth Storage - sessionStorage Isolation", () => {
+  sessionStorage.clear();
+  assert.equal(readAuthToken(), null);
+
+  const testToken = "jwt.header.payload.signature";
+  assert.equal(saveAuthToken(testToken), true);
+  assert.equal(readAuthToken(), testToken);
+  assert.equal(sessionStorage.getItem(AUTH_TOKEN_KEY), testToken);
+  assert.equal(localStorage.getItem(AUTH_TOKEN_KEY), null, "Token must NOT be in localStorage");
+
+  clearAuthToken();
+  assert.equal(readAuthToken(), null);
+
+  assert.equal(validAuthUser({ id: "user-1", email: "test@example.com" }), true);
+  assert.equal(validAuthUser({ id: "user-1", email: "a".repeat(300) }), false);
+  assert.equal(validAuthUser(null), false);
+});
+
+test("6. Cloud Sync - Snapshot Validation and 3-Way Merge", async () => {
+  const validSnapshot = {
+    challenges: [
+      {
+        id: "11111111-2222-4333-8444-555555555555",
+        title: "Cloud Challenge",
+        description: null,
+        duration: 30,
+        startDate: "2026-10-01",
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    completions: [
+      {
+        challengeId: "11111111-2222-4333-8444-555555555555",
+        completionDate: "2026-10-01",
+        updatedAt: "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    notes: [
+      {
+        challengeId: "11111111-2222-4333-8444-555555555555",
+        note: { content: "Cloud note", updatedAt: "2026-10-01T00:00:00.000Z" }
+      }
+    ],
+    tombstones: [],
+    preferences: { language: "en", remindersEnabled: false, updatedAt: null }
+  };
+
+  assert.doesNotThrow(() => validateCloudSnapshot(validSnapshot));
+
+  // Invalid snapshots should throw syncInvalid
+  assert.throws(() => validateCloudSnapshot(null), /syncInvalid/);
+  assert.throws(() => validateCloudSnapshot({ ...validSnapshot, challenges: "bad" }), /syncInvalid/);
+
+  // Test note hash calculation
+  const hash1 = await syncNoteHash("test note");
+  const hash2 = await syncNoteHash("test note");
+  const hash3 = await syncNoteHash("different note");
+  assert.equal(hash1, hash2);
+  assert.notEqual(hash1, hash3);
+  assert.equal(await syncNoteHash(null), null);
+
+  // Test analyseSync (download new cloud challenge to local)
+  const emptyLocal = { version: 1, language: "en", challenges: [] };
+  const syncStore = { version: 1, accounts: {} };
+  const syncAccount = ensureSyncAccount(syncStore, "user-123");
+
+  const plan = await analyseSync(emptyLocal, null, validSnapshot, syncAccount, null, {});
+  assert.equal(plan.conflicts.length, 0);
+  assert.equal(plan.nextState.challenges.length, 1);
+  assert.equal(plan.nextState.challenges[0].name, "Cloud Challenge");
+  assert.equal(plan.nextState.challenges[0].completedDays.length, 1);
+  assert.equal(plan.nextState.challenges[0].note, "Cloud note");
+
+  // Test 3-Way Conflict Detection when both Local and Cloud modify the challenge
+  const conflictLocal = {
+    version: 1,
+    language: "en",
+    challenges: [
+      {
+        id: "loc-conf-1",
+        name: "Local Modified Title",
+        durationDays: 30,
+        startDate: "2026-10-01",
+        completedDays: [1],
+        createdAt: "2026-10-01T00:00:00.000Z",
+        note: "Local Modified Note"
+      }
+    ]
+  };
+
+  const accountWithBaseline = {
+    lastSyncedAt: "2026-10-02T00:00:00.000Z",
+    challenges: {
+      "loc-conf-1": {
+        cloudId: "cloud-conf-1",
+        migrationKey: "mig-1",
+        baseline: {
+          fields: { title: "Original Baseline Title", duration: 30, startDate: "2026-10-01" },
+          challengeUpdatedAt: "2026-10-02T00:00:00.000Z",
+          completionDates: ["2026-10-01"],
+          noteHash: await syncNoteHash("Original Note"),
+          noteUpdatedAt: "2026-10-02T00:00:00.000Z"
+        },
+        lastSyncedAt: "2026-10-02T00:00:00.000Z"
+      }
+    },
+    preferencesBaseline: null,
+    pending: {
+      challengeChanges: { "loc-conf-1": "2026-10-03T01:00:00.000Z" },
+      noteChanges: { "loc-conf-1": "2026-10-03T01:00:00.000Z" },
+      challengeDeletes: {},
+      completionAdds: {},
+      completionDeletes: {},
+      preferencesChangedAt: null
+    }
+  };
+
+  const snapshotWithCloudEdit = {
+    challenges: [
+      {
+        id: "cloud-conf-1",
+        title: "Cloud Modified Title",
+        description: null,
+        duration: 30,
+        startDate: "2026-10-01",
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-03T02:00:00.000Z"
+      }
+    ],
+    completions: [
+      {
+        challengeId: "cloud-conf-1",
+        completionDate: "2026-10-01",
+        updatedAt: "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    notes: [
+      {
+        challengeId: "cloud-conf-1",
+        note: { content: "Cloud Modified Note", updatedAt: "2026-10-03T02:00:00.000Z" }
+      }
+    ],
+    tombstones: [],
+    preferences: { language: "en", remindersEnabled: false, updatedAt: null }
+  };
+
+  const conflictPlan = await analyseSync(conflictLocal, JSON.stringify(conflictLocal), snapshotWithCloudEdit, accountWithBaseline, null, {});
+  assert.equal(conflictPlan.conflicts.length, 2, "Must detect 2 conflicts: challenge fields and note");
+  assert.equal(conflictPlan.conflicts[0].kind, "challenge");
+  assert.equal(conflictPlan.conflicts[1].kind, "note");
+
+  // Conflict resolution: choose local for challenge, cloud for note
+  const resolvedPlan = await analyseSync(conflictLocal, JSON.stringify(conflictLocal), snapshotWithCloudEdit, accountWithBaseline, null, {
+    "challenge:loc-conf-1": "local",
+    "note:loc-conf-1": "cloud"
+  });
+  assert.equal(resolvedPlan.conflicts.length, 0, "Resolved conflicts must have length 0");
+  const resolvedItem = resolvedPlan.nextState.challenges[0];
+  assert.equal(resolvedItem.name, "Local Modified Title");
+  assert.equal(resolvedItem.note, "Cloud Modified Note");
+});
+
+test("8. Sync Mutation Tracking and applyingSyncState Lock", () => {
+  localStorage.clear();
+  const syncStore = {
+    version: 1,
+    accounts: {
+      "user-1": {
+        lastSyncedAt: "2026-10-01T00:00:00.000Z",
+        challenges: {
+          "c-1": {
+            cloudId: "cloud-1",
+            migrationKey: "mig-1",
+            baseline: null,
+            lastSyncedAt: "2026-10-01T00:00:00.000Z"
+          }
+        },
+        preferencesBaseline: null,
+        pending: {
+          challengeChanges: {},
+          noteChanges: {},
+          challengeDeletes: {},
+          completionAdds: {},
+          completionDeletes: {},
+          preferencesChangedAt: null
+        }
+      }
+    }
+  };
+  saveSyncMetadata(syncStore);
+
+  const prev = {
+    version: 1,
+    language: "en",
+    challenges: [
+      { id: "c-1", name: "Initial Name", durationDays: 30, startDate: "2026-10-01", completedDays: [1], createdAt: "2026-10-01T00:00:00.000Z" }
+    ],
+    reminders: { enabled: false }
+  };
+  const next = {
+    version: 1,
+    language: "en",
+    challenges: [
+      { id: "c-1", name: "Updated Name", durationDays: 30, startDate: "2026-10-01", completedDays: [1, 2], createdAt: "2026-10-01T00:00:00.000Z", note: "New note" }
+    ],
+    reminders: { enabled: false }
+  };
+
+  // Normal persist: should capture challengeChange, completionAdd, and noteChange
+  captureSyncMutations(JSON.stringify(prev), JSON.stringify(next));
+
+  const updatedStore = readSyncMetadata();
+  const pending = updatedStore.accounts["user-1"].pending;
+  assert.ok(pending.challengeChanges["c-1"], "Must capture challenge title update");
+  assert.ok(pending.noteChanges["c-1"], "Must capture note creation");
+  assert.ok(pending.completionAdds["c-1"]["2026-10-02"], "Must capture completed day 2");
+
+  // When applyingSyncState is true, persist() MUST NOT capture mutations
+  setApplyingSyncState(true);
+  assert.equal(isApplyingSyncState(), true);
+  // Clear pending
+  pending.challengeChanges = {};
+  saveSyncMetadata(updatedStore);
+
+  const stateToPersist = { ...next, challenges: [{ ...next.challenges[0], name: "Cloud Applied Name" }] };
+  persist(stateToPersist, JSON.stringify(next));
+
+  const finalStore = readSyncMetadata();
+  assert.deepEqual(finalStore.accounts["user-1"].pending.challengeChanges, {}, "Cloud applied updates must NOT be captured as local mutations");
+  setApplyingSyncState(false);
+});
+
+
+test("7. Cloud Backup Source Reader", () => {
+  localStorage.clear();
+  const sampleLocal = {
+    version: 1,
+    language: "en",
+    challenges: [
+      {
+        id: "loc-1",
+        name: "Morning Run",
+        durationDays: 30,
+        startDate: "2026-10-01",
+        completedDays: [1, 2],
+        createdAt: "2026-10-01T00:00:00.000Z",
+        note: "Great run"
+      }
+    ],
+    reminders: { enabled: true, lastReminderDate: "2026-10-03" }
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleLocal));
+
+  const validated = readMigrationSource();
+  assert.equal(validated.counts.challenges, 1);
+  assert.equal(validated.counts.completions, 2);
+  assert.equal(validated.counts.notes, 1);
+  assert.equal(validated.source.challenges[0].name, "Morning Run");
+});
