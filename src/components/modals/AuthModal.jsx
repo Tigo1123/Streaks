@@ -18,6 +18,7 @@ export function AuthModal() {
     formErrorKey,
     noticeKey,
     isSubmitting,
+    clearErrors,
   } = useAuth();
 
   const { status: syncStatus, isRunning: isSyncRunning, startSync } = useSync();
@@ -30,21 +31,29 @@ export function AuthModal() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const isOpen = modalMode === "auth";
-  const isRtl = language === "ar";
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setLocalError("");
-    if (!email || !password) {
-      setLocalError("Please fill in all fields");
+    if (!email.trim()) {
+      setLocalError("authEmailRequired");
+      return;
+    }
+    if (!e.currentTarget.elements.authEmailInput.validity.valid) {
+      setLocalError("authInvalidEmail");
+      return;
+    }
+    if (!password) {
+      setLocalError("authPasswordRequired");
       return;
     }
 
     const res = await login(email, password);
     if (res.success) {
-      showToast(isRtl ? "تم تسجيل الدخول بنجاح" : "Signed in successfully");
+      showToast(t("authSuccess", {}, language));
       setEmail("");
       setPassword("");
       closeModal();
@@ -54,12 +63,20 @@ export function AuthModal() {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setLocalError("");
-    if (!email || !password || !confirmPassword) {
-      setLocalError("Please fill in all fields");
+    if (!email.trim()) {
+      setLocalError("authEmailRequired");
+      return;
+    }
+    if (!e.currentTarget.elements.authEmailInput.validity.valid) {
+      setLocalError("authInvalidEmail");
+      return;
+    }
+    if (!password || !confirmPassword) {
+      setLocalError("authPasswordRequired");
       return;
     }
     if (password.length < 8) {
-      setLocalError(t("authPasswordTooShort", {}, language) || "Password must be at least 8 characters");
+      setLocalError("authPasswordShort");
       return;
     }
     if (password !== confirmPassword) {
@@ -69,7 +86,7 @@ export function AuthModal() {
 
     const res = await register(email, password);
     if (res.success) {
-      showToast(isRtl ? "تم إنشاء الحساب وتسجيل الدخول" : "Account created and signed in!");
+      showToast(t("authRegisterSuccess", {}, language));
       setEmail("");
       setPassword("");
       setConfirmPassword("");
@@ -79,7 +96,7 @@ export function AuthModal() {
 
   const handleLogout = () => {
     logout();
-    showToast(t("authLogoutSuccess", {}, language) || (isRtl ? "تم تسجيل الخروج" : "Signed out"));
+    showToast(t("authLogoutSuccess", {}, language));
     closeModal();
   };
 
@@ -107,8 +124,10 @@ export function AuthModal() {
       <Modal
         isOpen={isOpen}
         onClose={closeModal}
-        title={isRtl ? "حسابك" : "Account"}
+        title={t("authAccountTitle", {}, language)}
         footer={footer}
+        dialogClassName="auth-modal-dialog"
+        closeLabel={t("authClose", {}, language)}
       >
         <div className="modal-content-stack">
           {/* Account Profile / Identity Section with Clear Logout Action */}
@@ -150,7 +169,7 @@ export function AuthModal() {
               onClick={startSync}
               disabled={isSyncRunning}
             >
-              {isSyncRunning ? t("syncing", {}, language) : (isRtl ? "مزامنة الآن" : "Sync Now")}
+              {isSyncRunning ? t("syncing", {}, language) : t("syncAction", {}, language)}
             </button>
             <p className="cloud-card-note">
               {t("syncTombstoneRule", {}, language)}
@@ -179,13 +198,8 @@ export function AuthModal() {
 
   // Unauthenticated: Login or Register
   const isRegister = authView === "register";
-  const modalTitle = isRegister
-    ? (isRtl ? "إنشاء حساب" : "Create your account")
-    : (isRtl ? "مرحباً بعودتك" : "Welcome back");
-
-  const modalSubtitle = isRegister
-    ? (isRtl ? "زامِن تقدمك وسلاسل عاداتك عبر مختلف الأجهزة." : "Sync your progress across devices.")
-    : (isRtl ? "واصل بناء سلسلة إنجازاتك اليومية." : "Continue building your streak.");
+  const modalTitle = t(isRegister ? "authRegisterTitle" : "authLoginTitle", {}, language);
+  const modalSubtitle = t(isRegister ? "authRegisterSubtitle" : "authLoginSubtitle", {}, language);
 
   const footer = (
     <>
@@ -195,14 +209,17 @@ export function AuthModal() {
       <button
         type="submit"
         form={isRegister ? "registerForm" : "loginForm"}
-        className="btn btn-primary"
+        className="btn btn-primary auth-submit-btn"
         disabled={isSubmitting}
       >
         {isSubmitting
-          ? t(isRegister ? "authWorkingRegister" : "authWorkingLogin", {}, language)
-          : isRegister
-          ? (isRtl ? "إنشاء الحساب" : "Create account")
-          : (isRtl ? "تسجيل الدخول" : "Sign in")}
+          ? (
+            <>
+              <span className="auth-loading-indicator" aria-hidden="true" />
+              <span aria-live="polite">{t(isRegister ? "authWorkingRegister" : "authWorkingLogin", {}, language)}</span>
+            </>
+          )
+          : t(isRegister ? "authCreateAccount" : "authLogin", {}, language)}
       </button>
     </>
   );
@@ -213,6 +230,8 @@ export function AuthModal() {
       onClose={closeModal}
       title={modalTitle}
       footer={footer}
+      dialogClassName="auth-modal-dialog"
+      closeLabel={t("authClose", {}, language)}
     >
       <div className="modal-content-stack">
         <p className="modal-subtitle">{modalSubtitle}</p>
@@ -233,6 +252,8 @@ export function AuthModal() {
           id={isRegister ? "registerForm" : "loginForm"}
           onSubmit={isRegister ? handleRegisterSubmit : handleLoginSubmit}
           className="modal-form"
+          aria-busy={isSubmitting}
+          noValidate
         >
           <div className="form-group">
             <label htmlFor="authEmailInput" className="form-label">
@@ -249,6 +270,7 @@ export function AuthModal() {
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
               autoFocus
+              disabled={isSubmitting}
             />
           </div>
 
@@ -256,17 +278,39 @@ export function AuthModal() {
             <label htmlFor="authPasswordInput" className="form-label">
               {t("authPassword", {}, language)}
             </label>
-            <input
-              id="authPasswordInput"
-              type="password"
-              className="form-input"
-              required
-              minLength={isRegister ? 8 : undefined}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={isRegister ? "new-password" : "current-password"}
-            />
+            <div className="auth-password-field">
+              <input
+                id="authPasswordInput"
+                type={showPassword ? "text" : "password"}
+                className="form-input"
+                required
+                minLength={isRegister ? 8 : undefined}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={isRegister ? "new-password" : "current-password"}
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                className="auth-password-toggle"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={t(showPassword ? "authHidePassword" : "authShowPassword", {}, language)}
+                aria-pressed={showPassword}
+                disabled={isSubmitting}
+              >
+                {showPassword ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A10.8 10.8 0 0 1 12 5c5.2 0 8.5 5.1 9 6-.2.4-1.4 2.4-3.8 3.9M6.2 6.2C3.8 7.7 2.2 10.1 2 11c.4.8 3.7 8 10 8 1.1 0 2.1-.2 3-.6" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M2 12s3.3-7 10-7 10 7 10 7-3.3 7-10 7S2 12 2 12Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           {isRegister && (
@@ -276,7 +320,7 @@ export function AuthModal() {
               </label>
               <input
                 id="authConfirmInput"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 className="form-input"
                 required
                 minLength={8}
@@ -284,34 +328,31 @@ export function AuthModal() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
+                disabled={isSubmitting}
               />
             </div>
           )}
 
           {(localError || formErrorKey) && (
             <div className="form-error" role="alert">
-              {localError || t(formErrorKey, {}, language)}
+              {localError ? t(localError, {}, language) : t(formErrorKey, {}, language)}
             </div>
           )}
         </form>
 
         <div className="auth-switch-wrap">
-          <span className="auth-switch-text">
-            {isRegister
-              ? (isRtl ? "لديك حساب بالفعل؟" : "Already have an account?")
-              : (isRtl ? "ليس لديك حساب؟" : "Don't have an account?")}
-          </span>
           <button
             type="button"
             className="auth-switch-btn"
             onClick={() => {
               setAuthView(isRegister ? "login" : "register");
               setLocalError("");
+              clearErrors();
+              setShowPassword(false);
             }}
+            disabled={isSubmitting}
           >
-            {isRegister
-              ? (isRtl ? "تسجيل الدخول" : "Sign in")
-              : (isRtl ? "إنشاء حساب" : "Create one")}
+            {t(isRegister ? "authAlreadyAccount" : "authNeedAccount", {}, language)}
           </button>
         </div>
       </div>

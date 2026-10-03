@@ -283,3 +283,22 @@ test("Phase 6 - Landing is limited to new visitors and previews the app in both 
     assert.equal(typeof ar[key], "string", `Arabic landing translation exists for ${key}`);
   }
 });
+
+test("Phase 6 - Auth modal provides localized password visibility and pending states", () => {
+  const authModal = fs.readFileSync(path.join(projectRoot, "src/components/modals/AuthModal.jsx"), "utf8");
+  const modal = fs.readFileSync(path.join(projectRoot, "src/components/common/Modal.jsx"), "utf8");
+  const styles = fs.readFileSync(path.join(projectRoot, "src/styles/modals.css"), "utf8");
+
+  assert.ok(authModal.includes('type={showPassword ? "text" : "password"}'), "Password fields can be revealed");
+  assert.ok(authModal.includes('aria-pressed={showPassword}'), "Password visibility state is exposed accessibly");
+  assert.ok(authModal.includes("authWorkingRegister"), "Registration has a translated pending label");
+  assert.ok(authModal.includes("authWorkingLogin"), "Login has a translated pending label");
+  assert.ok(authModal.includes('role="alert"'), "Authentication failures are announced");
+  assert.ok(modal.includes("closeLabel = \"Close dialog\""), "Modal close action supports a localized accessible label");
+  assert.ok(styles.includes(".auth-modal-dialog"), "Auth dialog has scoped glass styling");
+  assert.ok(styles.includes(".auth-password-toggle:focus-visible"), "Password toggle has a visible focus state");
+  for (const key of ["authLoginSubtitle", "authRegisterSubtitle", "authShowPassword", "authHidePassword"]) {
+    assert.equal(typeof en[key], "string", `English auth translation exists for ${key}`);
+    assert.equal(typeof ar[key], "string", `Arabic auth translation exists for ${key}`);
+  }
+});

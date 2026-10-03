@@ -207,6 +207,101 @@
   color: var(--color-primary-hover);
 }
 
+.auth-modal-dialog {
+  background:
+    linear-gradient(145deg, rgba(123, 92, 255, 0.12), rgba(59, 130, 246, 0.04)),
+    rgba(23, 26, 43, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.auth-modal-dialog .modal-header {
+  padding-block: var(--space-5);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.auth-modal-dialog .modal-title {
+  font-size: 1.3rem;
+}
+
+.auth-modal-dialog .modal-body {
+  gap: var(--space-4);
+}
+
+.auth-modal-dialog .modal-footer {
+  flex-wrap: wrap;
+}
+
+.auth-modal-dialog .modal-footer .btn {
+  min-height: 44px;
+}
+
+.auth-password-field {
+  position: relative;
+}
+
+.auth-password-field .form-input {
+  padding-inline-end: 52px;
+  direction: ltr;
+  text-align: start;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 4px;
+  width: 44px;
+  height: 44px;
+  margin-block: auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.auth-password-toggle:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.auth-password-toggle:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.auth-password-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.auth-submit-btn {
+  min-width: 148px;
+}
+
+.auth-loading-indicator {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: auth-spinner 700ms linear infinite;
+}
+
+@keyframes auth-spinner {
+  to { transform: rotate(360deg); }
+}
+
+.auth-modal-dialog .form-input:disabled,
+.auth-modal-dialog .auth-password-toggle:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 .account-section {
   display: flex;
   flex-direction: column;
@@ -338,6 +433,21 @@
   }
 }
 
+@media (max-width: 420px) {
+  .auth-modal-dialog .modal-header,
+  .auth-modal-dialog .modal-body {
+    padding-inline: var(--space-4);
+  }
+
+  .auth-modal-dialog .modal-footer {
+    padding-inline: var(--space-4);
+  }
+
+  .auth-modal-dialog .modal-footer .btn {
+    flex: 1 1 auto;
+  }
+}
+
 .sync-value {
   padding: var(--space-3);
   border: 1px solid var(--border-card);
@@ -370,5 +480,11 @@
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-loading-indicator {
+    animation: none;
   }
 }

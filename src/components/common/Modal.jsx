@@ -8,7 +8,9 @@ export function Modal({
   footer,
   preventClose = false,
   maxWidth = 460,
-  ariaLabel
+  ariaLabel,
+  dialogClassName = "",
+  closeLabel = "Close dialog"
 }) {
   const dialogRef = useRef(null);
   const openerRef = useRef(null);
@@ -94,7 +96,7 @@ export function Modal({
     >
       <div
         ref={dialogRef}
-        className="modal-dialog"
+        className={`modal-dialog ${dialogClassName}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? "modalTitle" : undefined}
@@ -110,7 +112,7 @@ export function Modal({
               type="button"
               className="modal-close-btn"
               onClick={onClose}
-              aria-label="Close dialog"
+              aria-label={closeLabel}
             >
               ✕
             </button>
