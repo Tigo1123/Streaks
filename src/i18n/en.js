@@ -54,6 +54,8 @@ export const en = {
   "completion": "Complete",
   "currentStreak": "Current streak",
   "longestStreak": "Longest streak",
+  "lastSevenDays": "Last 7 challenge days",
+  "weekBarsDescription": "Last {total} challenge days: {completed} completed",
   "remaining": "Days incomplete",
   "tracker": "Daily tracker",
   "markDone": "Mark day {day} complete",

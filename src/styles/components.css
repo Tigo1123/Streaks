@@ -1942,3 +1942,292 @@ html[dir="rtl"] .dashboard-table {
     padding: var(--space-4);
   }
 }
+
+/* --------------------------------------------------------------------------
+   Phase 6 · Batch 3: challenge detail, calendar, and weekly streak summary
+   -------------------------------------------------------------------------- */
+.detail-hero-card {
+  background:
+    linear-gradient(135deg, rgba(123, 92, 255, 0.14), rgba(59, 130, 246, 0.06)),
+    var(--bg-card);
+  border: 1px solid var(--border-card);
+  box-shadow: var(--shadow-card);
+}
+
+.detail-title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.detail-streak-badge,
+.detail-ratio-pill {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.detail-section-card,
+.detail-metrics-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  box-shadow: none;
+}
+
+.detail-section-heading {
+  color: var(--text-secondary);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.detail-section-hint {
+  color: var(--text-muted);
+}
+
+.detail-metrics-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--space-5);
+}
+
+.detail-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: center;
+  gap: var(--space-3);
+}
+
+.metric-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 88px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  background: rgba(11, 13, 26, 0.32);
+}
+
+.metric-box-val {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.metric-box-lbl {
+  color: var(--text-secondary);
+}
+
+.detail-week-summary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px solid var(--border-card);
+}
+
+.week-bars {
+  min-width: 0;
+}
+
+.week-bars-columns {
+  min-height: 116px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: clamp(4px, 1.2vw, 12px);
+}
+
+.week-bar-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.week-bar-visual {
+  width: 100%;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.week-bar-flame {
+  width: 16px;
+  height: 18px;
+  color: #ff9a70;
+}
+
+.week-bar-flame svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.week-bar-track {
+  width: min(100%, 30px);
+  height: 68px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--color-column-inactive);
+}
+
+.week-bar-fill {
+  width: 100%;
+  height: 24%;
+  border-radius: inherit;
+  background: var(--color-column-inactive);
+}
+
+.week-bar-column.completed .week-bar-fill {
+  height: 100%;
+  background: var(--gradient-accent);
+}
+
+.week-bar-column.missed .week-bar-fill {
+  height: 42%;
+  background: #494c6d;
+}
+
+.week-bar-column.upcoming .week-bar-track,
+.week-bar-column.before-start .week-bar-track {
+  background: rgba(42, 45, 74, 0.48);
+}
+
+.week-bar-column.upcoming .week-bar-fill,
+.week-bar-column.before-start .week-bar-fill {
+  height: 12%;
+  background: rgba(42, 45, 74, 0.6);
+}
+
+.week-bar-label {
+  min-width: 24px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.day-grid {
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 8px;
+  direction: inherit;
+}
+
+.day-cell {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--border-card);
+  background: rgba(255, 255, 255, 0.035);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-cell:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: none;
+}
+
+.day-cell.done {
+  background: var(--gradient-accent);
+  box-shadow: none;
+}
+
+.day-cell.today {
+  border: 2px solid #b5a5ff;
+  animation: none;
+}
+
+.day-cell.future {
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-muted);
+  opacity: 0.68;
+}
+
+.detail-back-pill,
+.detail-delete-btn {
+  min-height: 44px;
+}
+
+.detail-back-pill {
+  padding-inline: var(--space-4);
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+}
+
+.detail-delete-btn {
+  padding-inline: var(--space-3);
+}
+
+.detail-not-found {
+  color: var(--text-primary);
+}
+
+.detail-not-found p {
+  color: var(--text-secondary);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .detail-metrics-card {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .detail-metrics-grid {
+    gap: var(--space-2);
+  }
+
+  .metric-box {
+    min-height: 76px;
+  }
+
+  .detail-week-summary {
+    padding-inline-start: 0;
+    padding-block-start: var(--space-4);
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--border-card);
+  }
+
+  .week-bars-columns {
+    min-height: 104px;
+  }
+
+  .week-bar-visual {
+    min-height: 80px;
+  }
+
+  .week-bar-track {
+    height: 58px;
+  }
+
+  .detail-section-card {
+    padding: var(--space-4);
+  }
+}

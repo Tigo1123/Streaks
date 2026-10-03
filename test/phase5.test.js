@@ -240,3 +240,21 @@ test("Phase 6 - Dashboard progress rings are accessible and shared across cards"
   assert.ok(styles.includes("font-variant-numeric: tabular-nums;"), "Ring values use stable, readable numerals");
   assert.ok(variables.includes("--color-primary: #a18cff;"), "Dashboard text accent meets contrast on the dark canvas");
 });
+
+test("Phase 6 - Challenge detail renders weekly bars and retains calendar controls", () => {
+  const weekBars = fs.readFileSync(path.join(projectRoot, "src/components/challenge/WeekBars.jsx"), "utf8");
+  const metrics = fs.readFileSync(path.join(projectRoot, "src/components/challenge/StreakMetrics.jsx"), "utf8");
+  const detail = fs.readFileSync(path.join(projectRoot, "src/components/challenge/ChallengeDetail.jsx"), "utf8");
+  const grid = fs.readFileSync(path.join(projectRoot, "src/components/challenge/DayGrid.jsx"), "utf8");
+  const styles = fs.readFileSync(path.join(projectRoot, "src/styles/components.css"), "utf8");
+
+  assert.ok(weekBars.includes('role="img"'), "Weekly bars expose a chart image role");
+  assert.ok(weekBars.includes('aria-label={t("weekBarsDescription"'), "Weekly chart has localized text description");
+  assert.ok(weekBars.includes("<FlameIcon />"), "Completed days receive a flame indicator");
+  assert.ok(weekBars.includes("dayIndex(challenge, today)"), "Chart reads day from the configured today input");
+  assert.ok(metrics.includes("<WeekBars"), "Streak metrics render the weekly chart");
+  assert.ok(detail.includes("<StreakMetrics"), "Challenge detail includes streak metrics");
+  assert.ok(grid.includes('disabled={future}'), "Future calendar days remain non-interactive");
+  assert.ok(styles.includes("grid-template-columns: repeat(7, minmax(0, 1fr));"), "Weekly chart has seven columns");
+  assert.ok(styles.includes("min-width: 44px;"), "Calendar day controls retain minimum touch size");
+});

@@ -5,6 +5,7 @@ import { useToast } from "../../hooks/useToast.js";
 import { progress as getProgress, streakStats } from "../../utils/streakCalculations.js";
 import { ProgressBar } from "../common/ProgressBar.jsx";
 import { DayGrid } from "./DayGrid.jsx";
+import { StreakMetrics } from "./StreakMetrics.jsx";
 import { NoteEditor } from "./NoteEditor.jsx";
 import { t } from "../../i18n/index.js";
 import { useTimezone } from "../../hooks/useTimezone.js";
@@ -104,6 +105,8 @@ export function ChallengeDetail() {
           <ProgressBar value={prog} height={10} />
         </div>
       </header>
+
+      <StreakMetrics challenge={challenge} language={language} today={today} />
 
       {/* YOUR PROGRESS: Habit Calendar Grid */}
       <section className="detail-section-card" aria-labelledby="progressSectionHeading">

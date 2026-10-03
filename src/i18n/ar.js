@@ -54,6 +54,8 @@ export const ar = {
   "completion": "الإنجاز",
   "currentStreak": "السلسلة الحالية",
   "longestStreak": "أطول سلسلة",
+  "lastSevenDays": "آخر 7 أيام من التحدي",
+  "weekBarsDescription": "آخر {total} أيام من التحدي: {completed} مكتملة",
   "remaining": "أيام غير مكتملة",
   "tracker": "المتابعة اليومية",
   "markDone": "إكمال اليوم {day}",

@@ -163,8 +163,8 @@ test("1. i18n Translation Dictionary Equivalence", () => {
   const vanillaEnKeys = Object.keys(vanilla.i18n.en);
   const vanillaArKeys = Object.keys(vanilla.i18n.ar);
 
-  assert.equal(enKeys.length, 193, "English key count must include timezone settings");
-  assert.equal(arKeys.length, 193, "Arabic key count must include timezone settings");
+  assert.equal(enKeys.length, 195, "English key count must include timezone and weekly chart labels");
+  assert.equal(arKeys.length, 195, "Arabic key count must include timezone and weekly chart labels");
   assert.equal(vanillaEnKeys.length, 183);
   assert.equal(vanillaArKeys.length, 183);
 
@@ -176,6 +176,10 @@ test("1. i18n Translation Dictionary Equivalence", () => {
   assert.equal(typeof ar.quarantinedWarning, "string");
   assert.equal(typeof en.timezoneUseCurrent, "string");
   assert.equal(typeof ar.timezoneUseCurrent, "string");
+  assert.equal(typeof en.lastSevenDays, "string");
+  assert.equal(typeof ar.lastSevenDays, "string");
+  assert.equal(typeof en.weekBarsDescription, "string");
+  assert.equal(typeof ar.weekBarsDescription, "string");
 
   // Test interpolation
   assert.equal(t("dayOf", { day: 5, total: 30 }, "en"), "Day 5 of 30");
