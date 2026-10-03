@@ -5,6 +5,8 @@ import { dayIndex } from "../../utils/date.js";
 import { t } from "../../i18n/index.js";
 import { useTimezone } from "../../hooks/useTimezone.js";
 import { ProgressRing } from "../common/ProgressRing.jsx";
+import { completionDistribution } from "../../utils/statistics.js";
+import { DistributionCard } from "./DistributionCard.jsx";
 
 export function StatCards() {
   const { challenges, language } = useStreaks();
@@ -47,6 +49,7 @@ export function StatCards() {
     : 0;
 
   const todayPercent = todayDueCount > 0 ? Math.round((todayDoneCount / todayDueCount) * 100) : 0;
+  const distribution = completionDistribution(challenges, today);
 
   return (
     <section className="momentum-overview-container" aria-label={isRtl ? "ملخص الزخم والسلاسل" : "Momentum Overview"}>
@@ -103,6 +106,7 @@ export function StatCards() {
           </div>
         </div>
       </article>
+      <DistributionCard distribution={distribution} language={language} />
     </section>
   );
 }

@@ -163,8 +163,8 @@ test("1. i18n Translation Dictionary Equivalence", () => {
   const vanillaEnKeys = Object.keys(vanilla.i18n.en);
   const vanillaArKeys = Object.keys(vanilla.i18n.ar);
 
-  assert.equal(enKeys.length, 207, "English key count must include timezone, chart, landing, and auth labels");
-  assert.equal(arKeys.length, 207, "Arabic key count must include timezone, chart, landing, and auth labels");
+  assert.equal(enKeys.length, 209, "English key count must include timezone, chart, landing, auth, and distribution labels");
+  assert.equal(arKeys.length, 209, "Arabic key count must include timezone, chart, landing, auth, and distribution labels");
   assert.equal(vanillaEnKeys.length, 183);
   assert.equal(vanillaArKeys.length, 183);
 

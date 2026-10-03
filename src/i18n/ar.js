@@ -63,6 +63,8 @@ export const ar = {
   "longestStreak": "أطول سلسلة",
   "lastSevenDays": "آخر 7 أيام من التحدي",
   "weekBarsDescription": "آخر {total} أيام من التحدي: {completed} مكتملة",
+  "distributionTitle": "توزيع الأيام المستحقة",
+  "distributionDescription": "توزيع {due} من أيام التحدي المستحقة حتى الآن: {completed} مكتملة ({completedPercent}٪)، و{missed} فائتة ({missedPercent}٪).",
   "remaining": "أيام غير مكتملة",
   "tracker": "المتابعة اليومية",
   "markDone": "إكمال اليوم {day}",

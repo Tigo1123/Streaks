@@ -9,6 +9,7 @@ import { progress, streakStats, status as getStatus, remaining } from "../src/ut
 import { validImportChallenge, createInitialState, VERSION } from "../src/services/storage.js";
 import { en } from "../src/i18n/en.js";
 import { ar } from "../src/i18n/ar.js";
+import { completionDistribution } from "../src/utils/statistics.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -68,6 +69,58 @@ test("Phase 5 - StatCards Calculation Equivalence", () => {
   assert.equal(totalChallengeDays, 60, "Total challenge days should be 30 + 10 + 20 = 60");
   assert.equal(bestStreak, 10, "Best streak should be 10 from c2");
   assert.equal(completionRate, 27, "Completion rate should be 16/60 = 27%");
+});
+
+test("Phase 6 - Due-day distribution excludes future challenge days", () => {
+  const challenges = [
+    {
+      startDate: "2026-06-05",
+      durationDays: 10,
+      completedDays: [1, 2, 6, 7]
+    },
+    {
+      startDate: "2026-06-11",
+      durationDays: 5,
+      completedDays: []
+    },
+    {
+      startDate: "2026-06-01",
+      durationDays: 3,
+      completedDays: [1, 3]
+    }
+  ];
+
+  assert.deepEqual(completionDistribution(challenges, "2026-06-10"), {
+    completed: 5,
+    missed: 4,
+    due: 9,
+    completedPercent: 56,
+    missedPercent: 44
+  });
+  assert.deepEqual(completionDistribution([challenges[1]], "2026-06-10"), {
+    completed: 0,
+    missed: 0,
+    due: 0,
+    completedPercent: 0,
+    missedPercent: 0
+  });
+});
+
+test("Phase 6 - Distribution card is accessible, localized, and dashboard-only", () => {
+  const card = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/DistributionCard.jsx"), "utf8");
+  const statCards = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/StatCards.jsx"), "utf8");
+  const styles = fs.readFileSync(path.join(projectRoot, "src/styles/components.css"), "utf8");
+
+  assert.ok(card.includes('role="img"'), "Distribution bar has an image role");
+  assert.ok(card.includes("aria-label={description}"), "Distribution bar has a textual description");
+  assert.ok(card.includes('t("completed"'), "Completed category uses the shared localized label");
+  assert.ok(card.includes('t("missed"'), "Missed category uses the shared localized label");
+  assert.ok(statCards.includes("<DistributionCard"), "Distribution is rendered in dashboard statistics");
+  assert.ok(styles.includes(".distribution-card"), "Distribution card has scoped visual styles");
+  for (const key of ["distributionTitle", "distributionDescription"]) {
+    assert.equal(typeof en[key], "string", `English distribution translation exists for ${key}`);
+    assert.equal(typeof ar[key], "string", `Arabic distribution translation exists for ${key}`);
+  }
 });
 
 test("Phase 5 - Today Action Panel Logic", () => {

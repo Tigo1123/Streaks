@@ -63,6 +63,8 @@ export const en = {
   "longestStreak": "Longest streak",
   "lastSevenDays": "Last 7 challenge days",
   "weekBarsDescription": "Last {total} challenge days: {completed} completed",
+  "distributionTitle": "Due day distribution",
+  "distributionDescription": "Distribution of {due} challenge days due so far: {completed} completed ({completedPercent}%), {missed} missed ({missedPercent}%).",
   "remaining": "Days incomplete",
   "tracker": "Daily tracker",
   "markDone": "Mark day {day} complete",
