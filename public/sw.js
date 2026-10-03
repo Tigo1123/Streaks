@@ -1,4 +1,4 @@
-const CACHE_NAME = "streaks-shell-v6";
+const CACHE_NAME = "streaks-shell-v7";
 const CACHE_PREFIX = "streaks-shell-";
 const scopeUrl = new URL(self.registration.scope);
 const indexUrl = new URL("index.html", scopeUrl);
@@ -8,7 +8,12 @@ const shellUrls = [
   new URL("manifest.webmanifest", scopeUrl).href,
   new URL("icons/icon-192.png", scopeUrl).href,
   new URL("icons/icon-512.png", scopeUrl).href,
-  new URL("icons/apple-touch-icon.png", scopeUrl).href
+  new URL("icons/apple-touch-icon.png", scopeUrl).href,
+  new URL("fonts/manrope-latin.woff2", scopeUrl).href,
+  new URL("fonts/tajawal-arabic-regular.woff2", scopeUrl).href,
+  new URL("fonts/tajawal-latin-regular.woff2", scopeUrl).href,
+  new URL("fonts/tajawal-arabic-bold.woff2", scopeUrl).href,
+  new URL("fonts/tajawal-latin-bold.woff2", scopeUrl).href
 ];
 const shellPaths = new Set(shellUrls.map((url) => new URL(url).pathname));
 const assetsPath = new URL("assets/", scopeUrl).pathname;

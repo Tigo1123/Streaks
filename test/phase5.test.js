@@ -179,19 +179,28 @@ test("Phase 5 - Import / Export Format Compatibility", () => {
   assert.equal(dupValid, false, "Duplicate IDs must fail import validation");
 });
 
-test("Phase 5 - CSS Design System & Zeiss Token Integrity", () => {
+test("Phase 5 - Dark Design System Token Integrity", () => {
   const variablesCss = fs.readFileSync(path.join(projectRoot, "src/styles/variables.css"), "utf8");
+  const globalCss = fs.readFileSync(path.join(projectRoot, "src/styles/global.css"), "utf8");
   const componentsCss = fs.readFileSync(path.join(projectRoot, "src/styles/components.css"), "utf8");
   const modalsCss = fs.readFileSync(path.join(projectRoot, "src/styles/modals.css"), "utf8");
+  const serviceWorker = fs.readFileSync(path.join(projectRoot, "public/sw.js"), "utf8");
 
-  // Verify key tokens exist in variables.css
-  assert.ok(variablesCss.includes("--color-primary: #ef6f65;"), "Primary coral color preserved");
-  assert.ok(variablesCss.includes("--bg-app: #f4f6f8;"), "Zeiss light dashboard gray canvas token present");
-  assert.ok(variablesCss.includes("--bg-card: #ffffff;"), "Zeiss white card token present");
+  assert.ok(variablesCss.includes("--color-bg-top: #0b0d1a;"), "Dark navy background token present");
+  assert.ok(variablesCss.includes("--color-bg-bottom: #2b1f66;"), "Violet lower background token present");
+  assert.ok(variablesCss.includes("--color-surface-glass: rgba(255, 255, 255, 0.06);"), "Glass surface token present");
+  assert.ok(variablesCss.includes("--color-accent-violet: #7b5cff;"), "Violet accent token present");
+  assert.ok(variablesCss.includes("--color-column-inactive: #2a2d4a;"), "Inactive chart token present");
+  assert.ok(globalCss.includes('font-family: "Manrope"'), "Self-hosted Latin font family configured");
+  assert.ok(globalCss.includes('font-family: "Tajawal"'), "Self-hosted Arabic font family configured");
+  assert.ok(globalCss.includes("font-display: swap;"), "Fonts use swap display");
+  assert.ok(globalCss.includes("background-image: var(--gradient-app);"), "Dark gradient canvas is applied");
+  assert.ok(globalCss.includes("outline: 2px solid #b5a5ff;"), "Visible high-contrast focus outline is present");
   assert.ok(variablesCss.includes("--sidebar-width: 250px;"), "Sidebar width defined");
   assert.ok(variablesCss.includes("--topbar-height: 64px;"), "TopNav height defined");
+  assert.ok(componentsCss.includes("min-height: 44px;"), "Primary controls meet minimum touch target");
+  assert.ok(componentsCss.includes("background: var(--gradient-primary-button);"), "Primary button uses accessible violet-blue treatment");
 
-  // Verify components classes exist
   assert.ok(componentsCss.includes(".stat-card"), "stat-card class present");
   assert.ok(componentsCss.includes(".today-panel"), "today-panel class present");
   assert.ok(componentsCss.includes(".cards-grid"), "cards-grid class present");
@@ -199,7 +208,9 @@ test("Phase 5 - CSS Design System & Zeiss Token Integrity", () => {
   assert.ok(componentsCss.includes(".day-cell"), "day-cell class present");
   assert.ok(componentsCss.includes(".welcome-section"), "welcome-section class present");
 
-  // Verify modals
   assert.ok(modalsCss.includes(".modal-backdrop"), "modal-backdrop present");
   assert.ok(modalsCss.includes(".modal-dialog"), "modal-dialog present");
+  assert.ok(modalsCss.includes("@supports not (backdrop-filter: blur(1px))"), "Modal glass has a solid fallback");
+  assert.ok(serviceWorker.includes('streaks-shell-v7'), "Service worker shell cache version was advanced");
+  assert.ok(serviceWorker.includes('fonts/manrope-latin.woff2'), "Self-hosted fonts are cached for offline use");
 });

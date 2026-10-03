@@ -2,7 +2,7 @@
 .app-layout {
   display: flex;
   min-height: 100vh;
-  background-color: var(--bg-app);
+  background: transparent;
 }
 
 /* Sidebar Styles - Calm, Minimal & Focused */
