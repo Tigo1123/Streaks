@@ -21,7 +21,7 @@ function getGreeting(language) {
 }
 
 export function DashboardView() {
-  const { challenges, language } = useStreaks();
+  const { challenges, language, localDisplayName } = useStreaks();
   const { user, isAuthenticated, status } = useAuth();
   const { openModal } = useNavigation();
 
@@ -44,9 +44,7 @@ export function DashboardView() {
   }
 
   const baseGreeting = getGreeting(language);
-  const displayName = isAuthenticated && user?.email
-    ? user.email.split("@")[0]
-    : "";
+  const displayName = isAuthenticated ? user?.displayName || "" : localDisplayName;
   const greetingText = displayName
     ? `${baseGreeting}, ${displayName}`
     : baseGreeting;

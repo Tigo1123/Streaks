@@ -5,7 +5,7 @@ export const NavigationContext = createContext(null);
 export function NavigationProvider({ children }) {
   const [currentScreen, setCurrentScreen] = useState("dashboard"); // "dashboard" | "detail"
   const [selectedChallengeId, setSelectedChallengeId] = useState(null);
-  const [modalMode, setModalMode] = useState(null); // null | "create" | "delete" | "auth" | "backup" | "sync" | "timezone"
+  const [modalMode, setModalMode] = useState(null); // null | "create" | "delete" | "auth" | "backup" | "sync" | "timezone" | "settings"
   const [modalParams, setModalParams] = useState(null);
 
   const modalRef = useRef(modalMode);

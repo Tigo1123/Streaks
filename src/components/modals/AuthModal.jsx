@@ -7,6 +7,7 @@ import { useNavigation } from "../../hooks/useNavigation.js";
 import { useToast } from "../../hooks/useToast.js";
 import { t } from "../../i18n/index.js";
 import { loadGoogleIdentity, shouldShowGoogleSignIn } from "../../services/googleAuth.js";
+import { normalizeDisplayName } from "../../utils/profile.js";
 
 export function AuthModal() {
   const {
@@ -38,6 +39,7 @@ export function AuthModal() {
 
   const [authView, setAuthView] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState("");
@@ -165,11 +167,17 @@ export function AuthModal() {
       setLocalError(t("authPasswordMismatch", {}, language) || "Passwords do not match");
       return;
     }
+    const normalizedDisplayName = normalizeDisplayName(displayName);
+    if (normalizedDisplayName === null) {
+      setLocalError("profileNameInvalid");
+      return;
+    }
 
-    const res = await register(email, password);
+    const res = await register(email, password, normalizedDisplayName);
     if (res.success) {
       showToast(t("authRegisterSuccess", {}, language));
       setEmail("");
+      setDisplayName("");
       setPassword("");
       setConfirmPassword("");
       closeModal();
@@ -448,6 +456,24 @@ export function AuthModal() {
           aria-busy={isSubmitting}
           noValidate
         >
+          {isRegister && (
+            <div className="form-group">
+              <label htmlFor="authDisplayNameInput" className="form-label">
+                {t("authNameOptional", {}, language)}
+              </label>
+              <input
+                id="authDisplayNameInput"
+                type="text"
+                className="form-input"
+                maxLength={50}
+                autoComplete="name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+          )}
+
           <div className="form-group">
             <label htmlFor="authEmailInput" className="form-label">
               {t("authEmail", {}, language)}

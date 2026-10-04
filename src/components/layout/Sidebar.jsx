@@ -10,7 +10,7 @@ export function Sidebar({ isOpen, isMobile = false, onClose, sidebarRef }) {
   const { language } = useStreaks();
   const { status: syncStatus, isRunning: isSyncRunning } = useSync();
   const { currentScreen, goBack, openModal } = useNavigation();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const { showToast } = useToast();
 
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
@@ -48,7 +48,7 @@ export function Sidebar({ isOpen, isMobile = false, onClose, sidebarRef }) {
         }, 50);
       }
     } else if (action === "account") {
-      openModal("auth");
+      openModal("settings");
     } else if (action === "import-export") {
       openModal("import-export");
     }
@@ -118,11 +118,7 @@ export function Sidebar({ isOpen, isMobile = false, onClose, sidebarRef }) {
             onClick={() => handleNavClick("account")}
           >
             <span className="nav-icon" aria-hidden="true">👤</span>
-            <span>
-              {isAuthenticated && user?.email
-                ? `${t("authAccount", {}, language)} (${user.email.split("@")[0]})`
-                : t("authAccount", {}, language)}
-            </span>
+            <span>{t("settingsTitle", {}, language)}</span>
           </button>
 
           {isAuthenticated && (

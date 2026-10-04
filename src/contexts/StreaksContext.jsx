@@ -6,11 +6,13 @@ import { validDate } from "../utils/date.js";
 import { useToast } from "../hooks/useToast.js";
 import { t } from "../i18n/index.js";
 import { handleStorageEvent } from "../services/storageEvents.js";
+import { LOCAL_PROFILE_KEY, readLocalDisplayName, saveLocalDisplayName } from "../services/profileStorage.js";
 
 export const StreaksContext = createContext(null);
 
 export function StreaksProvider({ children }) {
   const [loadResult, setLoadResult] = useState(() => load());
+  const [localDisplayName, setLocalDisplayNameState] = useState(readLocalDisplayName);
   const state = loadResult.state;
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -50,12 +52,22 @@ export function StreaksProvider({ children }) {
 
   useEffect(() => {
     const handleStorage = (event) => {
+      if (event.key === LOCAL_PROFILE_KEY) {
+        setLocalDisplayNameState(readLocalDisplayName());
+        return;
+      }
       handleStorageEvent(event, loadResult.raw, stateRef.current, updateFromStorage);
     };
 
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, [loadResult.raw, updateFromStorage]);
+
+  const setLocalDisplayName = useCallback((value) => {
+    const saved = saveLocalDisplayName(value);
+    if (saved) setLocalDisplayNameState(readLocalDisplayName());
+    return saved;
+  }, []);
 
   const createChallenge = useCallback(async ({ name, durationDays, startDate }) => {
     const trimmedName = String(name || "").trim();
@@ -236,6 +248,7 @@ export function StreaksProvider({ children }) {
   const value = {
     challenges: state.challenges,
     language: state.language,
+    localDisplayName,
     loadError: loadResult.ok ? null : loadResult.error,
     rawStorageData: loadResult.raw,
     quarantinedCount: loadResult.quarantinedCount,
@@ -248,6 +261,7 @@ export function StreaksProvider({ children }) {
     saveNote,
     deleteNote,
     setLanguage,
+    setLocalDisplayName,
     importData,
     exportData,
     reloadFromStorage

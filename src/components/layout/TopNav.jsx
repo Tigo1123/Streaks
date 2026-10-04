@@ -7,7 +7,7 @@ import { useToast } from "../../hooks/useToast.js";
 import { t } from "../../i18n/index.js";
 
 export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
-  const { language, setLanguage } = useStreaks();
+  const { language, setLanguage, localDisplayName } = useStreaks();
   const { user, isAuthenticated, logout } = useAuth();
   const {
     status: syncStatus,
@@ -52,10 +52,6 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
   }, [isAccountMenuOpen]);
 
   const handleAccountClick = () => {
-    if (!isAuthenticated) {
-      openModal("auth");
-      return;
-    }
     setIsAccountMenuOpen((prev) => !prev);
   };
 
@@ -68,6 +64,11 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
   const handleOpenAccountModal = () => {
     setIsAccountMenuOpen(false);
     openModal("auth");
+  };
+
+  const handleOpenSettings = () => {
+    setIsAccountMenuOpen(false);
+    openModal("settings");
   };
 
   const handleSyncClick = () => {
@@ -101,6 +102,9 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
     }, language)
     : t("syncNever", {}, language);
   const syncLabel = `${syncStatusLabel} · ${syncLastLabel}`;
+  const displayName = isAuthenticated ? user?.displayName || "" : localDisplayName;
+  const accountLabel = displayName || t("authAccount", {}, language);
+  const accountInitial = displayName ? Array.from(displayName.trim())[0]?.toLocaleUpperCase() : "👤";
 
   return (
     <header className="topbar">
@@ -192,50 +196,71 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
             type="button"
             className="btn btn-secondary account-nav-btn"
             onClick={handleAccountClick}
-            aria-haspopup={isAuthenticated ? "menu" : undefined}
-            aria-expanded={isAuthenticated ? isAccountMenuOpen : undefined}
-            aria-label={isAuthenticated ? `${t("authAccount", {}, language)}: ${user?.email}` : t("authAccountLabel", {}, language)}
-            title={isAuthenticated ? `${user?.email} (${t("authAccount", {}, language)})` : t("authAccount", {}, language)}
+            aria-haspopup="menu"
+            aria-expanded={isAccountMenuOpen}
+            aria-label={`${t("authAccount", {}, language)}: ${accountLabel}`}
+            title={accountLabel}
           >
-            <span aria-hidden="true" style={{ fontSize: "0.95rem" }}>👤</span>
+            <span aria-hidden="true" className="account-nav-initial">{accountInitial}</span>
             <span className="account-nav-btn-text">
-              {isAuthenticated && user?.email
-                ? (user.email.split("@")[0] || t("authAccount", {}, language))
-                : t("authAccount", {}, language)}
+              {accountLabel}
             </span>
-            {isAuthenticated && (
-              <span aria-hidden="true" style={{ fontSize: "0.7rem", opacity: 0.65 }}>▾</span>
-            )}
+            <span aria-hidden="true" style={{ fontSize: "0.7rem", opacity: 0.65 }}>▾</span>
           </button>
 
-          {isAuthenticated && isAccountMenuOpen && (
+          {isAccountMenuOpen && (
             <div className="account-dropdown-menu" role="menu" aria-label={t("authAccount", {}, language)}>
               <div className="account-dropdown-user">
-                <span className="account-avatar" aria-hidden="true">👤</span>
+                <span className="account-avatar" aria-hidden="true">{accountInitial}</span>
                 <div className="account-dropdown-user-info">
-                  <span className="account-dropdown-label">{t("authSignedInAs", {}, language)}</span>
-                  <span className="account-dropdown-email" title={user?.email}>{user?.email}</span>
+                  <span className="account-dropdown-label">
+                    {isAuthenticated ? t("authSignedInAs", {}, language) : t("authAccount", {}, language)}
+                  </span>
+                  <span className="account-dropdown-name">{accountLabel}</span>
                 </div>
               </div>
               <div className="account-dropdown-divider" role="separator" />
               <button
                 type="button"
-                className="account-dropdown-item account-dropdown-logout"
-                role="menuitem"
-                onClick={handleMenuLogout}
-              >
-                <span aria-hidden="true">🚪</span>
-                <span>{t("authLogout", {}, language)}</span>
-              </button>
-              <button
-                type="button"
                 className="account-dropdown-item"
                 role="menuitem"
-                onClick={handleOpenAccountModal}
+                onClick={handleOpenSettings}
               >
                 <span aria-hidden="true">⚙️</span>
-                <span>{isRtl ? "تفاصيل الحساب والمزامنة" : "Account details & sync"}</span>
+                <span>{t("settingsTitle", {}, language)}</span>
               </button>
+              {isAuthenticated ? (
+                <>
+                  <button
+                    type="button"
+                    className="account-dropdown-item"
+                    role="menuitem"
+                    onClick={handleOpenAccountModal}
+                  >
+                    <span aria-hidden="true">☁️</span>
+                    <span>{t("settingsAccountSync", {}, language)}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="account-dropdown-item account-dropdown-logout"
+                    role="menuitem"
+                    onClick={handleMenuLogout}
+                  >
+                    <span aria-hidden="true">🚪</span>
+                    <span>{t("authLogout", {}, language)}</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="account-dropdown-item"
+                  role="menuitem"
+                  onClick={handleOpenAccountModal}
+                >
+                  <span aria-hidden="true">↪</span>
+                  <span>{t("authLogin", {}, language)}</span>
+                </button>
+              )}
             </div>
           )}
         </div>

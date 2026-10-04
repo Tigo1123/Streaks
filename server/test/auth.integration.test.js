@@ -48,6 +48,14 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
+  const patchJson = (path, body, token) => fetch(`${baseUrl}${path}`, {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(body)
+  });
   const invokeGoogleHandler = async (handler, body) => {
     let status = 200;
     let payload;
@@ -76,11 +84,13 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
   await t.test("valid registration normalizes email and stores only a bcrypt hash", async () => {
     const response = await postJson("/api/auth/register", {
       email: "  Test.User@Example.com ",
-      password: "correct horse battery"
+      password: "correct horse battery",
+      displayName: "  Test User  "
     });
     assert.equal(response.status, 201);
     const body = await response.json();
     assert.equal(body.user.email, "test.user@example.com");
+    assert.equal(body.user.displayName, "Test User");
     assert.equal("password_hash" in body.user, false);
 
     const stored = await pool.query("SELECT email, password_hash FROM users WHERE id = $1", [body.user.id]);
@@ -109,12 +119,34 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
     const body = await response.json();
     assert.equal(typeof body.token, "string");
     assert.equal(typeof body.refreshToken, "string");
+    assert.equal(body.user.displayName, "Test User");
     const claims = jwt.decode(body.token);
     assert.equal(claims.sub, body.user.id);
     assert.equal(claims.exp - claims.iat, 30 * 60);
     assert.equal("email" in claims, false);
     assert.equal("password" in claims, false);
     assert.equal("password_hash" in claims, false);
+  });
+
+  await t.test("profile names are validated and returned by profile and /me", async () => {
+    const login = await postJson("/api/auth/login", {
+      email: "test.user@example.com",
+      password: "correct horse battery"
+    });
+    const { token } = await login.json();
+    const updated = await patchJson("/api/auth/profile", { displayName: "  New Name  " }, token);
+    assert.equal(updated.status, 200);
+    assert.equal((await updated.json()).user.displayName, "New Name");
+
+    for (const displayName of ["", "  ", "x".repeat(51), "bad\nname", 42]) {
+      const invalid = await patchJson("/api/auth/profile", { displayName }, token);
+      assert.equal(invalid.status, 400);
+    }
+
+    const me = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { authorization: `Bearer ${token}` }
+    });
+    assert.equal((await me.json()).user.displayName, "New Name");
   });
 
   await t.test("refresh tokens rotate once and logout revokes the token family", async () => {
@@ -268,7 +300,7 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
     const response = await fetch(`${baseUrl}/api/auth/me`, { headers: { authorization: `Bearer ${token}` } });
     assert.equal(response.status, 200);
     const body = await response.json();
-    assert.deepEqual(Object.keys(body.user).sort(), ["createdAt", "email", "id", "timezone"]);
+    assert.deepEqual(Object.keys(body.user).sort(), ["createdAt", "displayName", "email", "id", "timezone"]);
     assert.equal(body.user.timezone, null);
     assert.equal(body.time.today, todayInZone(null, new Date(body.time.serverNow)));
   });

@@ -263,7 +263,7 @@ export function AuthProvider({ children }) {
     }
   }, [acceptLogin]);
 
-  const register = useCallback(async (email, password) => {
+  const register = useCallback(async (email, password, displayName = "") => {
     setIsSubmitting(true);
     setFormErrorKey(null);
     setNoticeKey(null);
@@ -273,7 +273,11 @@ export function AuthProvider({ children }) {
     try {
       const created = await authRequest("/api/auth/register", {
         method: "POST",
-        body: { email: email.trim().toLowerCase(), password }
+        body: {
+          email: email.trim().toLowerCase(),
+          password,
+          ...(displayName.trim() ? { displayName: displayName.trim() } : {})
+        }
       });
 
       if (currentOp !== authOperationRef.current) return { success: false };
@@ -314,6 +318,56 @@ export function AuthProvider({ children }) {
       if (currentOp === authOperationRef.current) setIsSubmitting(false);
     }
   }, [acceptLogin]);
+
+  const updateProfile = useCallback(async (displayName) => {
+    try {
+      let session = readAuthSession();
+      if (!session) return { success: false, errorKey: "authSessionExpired" };
+
+      let result = await authRequest("/api/auth/profile", {
+        method: "PATCH",
+        token: session.token,
+        body: { displayName }
+      });
+
+      if (result.response.status === 401) {
+        await restoreSession();
+        const refreshedSession = readAuthSession();
+        if (!refreshedSession || refreshedSession.user?.id !== session.user?.id ||
+            refreshedSession.token === session.token) {
+          return { success: false, errorKey: "authSessionExpired" };
+        }
+        session = refreshedSession;
+        result = await authRequest("/api/auth/profile", {
+          method: "PATCH",
+          token: session.token,
+          body: { displayName }
+        });
+      }
+
+      if (!result.response.ok) {
+        const errorKey = result.response.status === 400
+          ? "profileNameInvalid"
+          : result.response.status === 401
+          ? "authSessionExpired"
+          : "profileSaveFailed";
+        return { success: false, errorKey };
+      }
+      if (!validAuthUser(result.payload?.user) || result.payload.user.displayName !== displayName) {
+        return { success: false, errorKey: "profileSaveFailed" };
+      }
+
+      const currentSession = readAuthSession();
+      if (!currentSession || currentSession.user?.id !== result.payload.user.id) {
+        return { success: false, errorKey: "authSessionExpired" };
+      }
+      saveAuthSession({ ...currentSession, user: result.payload.user });
+      setUser((current) => current?.id === result.payload.user.id ? result.payload.user : current);
+      return { success: true, user: result.payload.user };
+    } catch (_) {
+      return { success: false, errorKey: "authNetworkError" };
+    }
+  }, [restoreSession]);
 
   const logout = useCallback(async () => {
     const savedSession = readAuthSession();
@@ -376,6 +430,7 @@ export function AuthProvider({ children }) {
     login,
     loginWithGoogle,
     register,
+    updateProfile,
     logout,
     updateUserTimezone,
     restoreSession: retrySession,

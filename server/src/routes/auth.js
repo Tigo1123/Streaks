@@ -9,6 +9,7 @@ const { config } = require("../config/env");
 const { requireAuth } = require("../middleware/auth");
 const { ApiError } = require("../utils/errors");
 const { timeContext } = require("../utils/timezone");
+const { normalizeDisplayName, optionalDisplayName } = require("../utils/profile");
 
 const router = express.Router();
 const googleOAuthClient = new OAuth2Client();
@@ -46,6 +47,7 @@ function safeUser(row) {
   return {
     id: row.id,
     email: row.email,
+    displayName: row.display_name ?? null,
     timezone: row.timezone ?? null,
     createdAt: new Date(row.created_at).toISOString()
   };
@@ -130,6 +132,7 @@ function createGoogleAuthHandler({
     }
 
     const email = normalizeEmail(identity.email);
+    const displayName = optionalDisplayName(identity.name);
     const client = await database.connect();
     let user;
     let refreshToken;
@@ -171,7 +174,7 @@ function createGoogleAuthHandler({
              SET google_sub = $2, display_name = COALESCE(display_name, $3)
              WHERE id = $1
              RETURNING id, email, password_hash, google_sub, display_name, timezone, created_at`,
-            [user.id, identity.sub, typeof identity.name === "string" ? identity.name.slice(0, 200) : null]
+            [user.id, identity.sub, displayName]
           );
           user = linked.rows[0];
           await client.query(
@@ -184,7 +187,7 @@ function createGoogleAuthHandler({
             `INSERT INTO users (email, password_hash, google_sub, display_name)
              VALUES ($1, NULL, $2, $3)
              RETURNING id, email, password_hash, google_sub, display_name, timezone, created_at`,
-            [email, identity.sub, typeof identity.name === "string" ? identity.name.slice(0, 200) : null]
+            [email, identity.sub, displayName]
           );
           user = created.rows[0];
           await client.query("INSERT INTO preferences (user_id) VALUES ($1)", [user.id]);
@@ -227,6 +230,12 @@ function readCredentials(body) {
 
 router.post("/register", registerRateLimit, async (req, res) => {
   const { email, password } = readCredentials(req.body);
+  const displayName = optionalDisplayName(req.body.displayName);
+  const suppliedDisplayName = req.body.displayName;
+  if (suppliedDisplayName !== undefined && suppliedDisplayName !== null &&
+      !(typeof suppliedDisplayName === "string" && !suppliedDisplayName.trim()) && !displayName) {
+    throw new ApiError(400, "Display name must be between 1 and 50 characters without control characters");
+  }
   if (Array.from(password).length < 8 || Buffer.byteLength(password, "utf8") > 72) {
     throw new ApiError(400, "Password must be at least 8 characters and no more than 72 UTF-8 bytes");
   }
@@ -236,10 +245,10 @@ router.post("/register", registerRateLimit, async (req, res) => {
   try {
     await client.query("BEGIN");
     const result = await client.query(
-      `INSERT INTO users (email, password_hash)
-       VALUES ($1, $2)
-       RETURNING id, email, timezone, created_at`,
-      [email, passwordHash]
+      `INSERT INTO users (email, password_hash, display_name)
+       VALUES ($1, $2, $3)
+       RETURNING id, email, display_name, timezone, created_at`,
+      [email, passwordHash, displayName]
     );
     await client.query("INSERT INTO preferences (user_id) VALUES ($1)", [result.rows[0].id]);
     await client.query("COMMIT");
@@ -265,7 +274,7 @@ router.post("/login", loginRateLimit, async (req, res) => {
   }
 
   const result = await pool.query(
-    "SELECT id, email, password_hash, timezone, created_at FROM users WHERE email = $1",
+    "SELECT id, email, password_hash, display_name, timezone, created_at FROM users WHERE email = $1",
     [email]
   );
   const user = result.rows[0];
@@ -285,6 +294,25 @@ router.post("/login", loginRateLimit, async (req, res) => {
 });
 
 router.post("/google", loginRateLimit, createGoogleAuthHandler());
+router.patch("/profile", requireAuth, async (req, res) => {
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body) ||
+      Object.keys(req.body).some((key) => key !== "displayName")) {
+    throw new ApiError(400, "A display name is required");
+  }
+  const displayName = normalizeDisplayName(req.body.displayName);
+  if (!displayName) {
+    throw new ApiError(400, "Display name must be between 1 and 50 characters without control characters");
+  }
+  const result = await pool.query(
+    `UPDATE users SET display_name = $2
+     WHERE id = $1
+     RETURNING id, email, display_name, timezone, created_at`,
+    [req.user.id, displayName]
+  );
+  if (!result.rowCount) throw new ApiError(401, "Authentication required");
+  return res.json({ user: safeUser(result.rows[0]) });
+});
+
 router.post("/refresh", async (req, res) => {
   if (!validRefreshRequest(req.body)) throw new ApiError(401, "Authentication required");
 
@@ -315,7 +343,7 @@ router.post("/refresh", async (req, res) => {
     }
 
     const userResult = await client.query(
-      "SELECT id, email, timezone, created_at FROM users WHERE id = $1",
+      "SELECT id, email, display_name, timezone, created_at FROM users WHERE id = $1",
       [session.user_id]
     );
     user = userResult.rows[0];
@@ -367,7 +395,7 @@ router.post("/logout", async (req, res) => {
 
 router.get("/me", requireAuth, async (req, res) => {
   const result = await pool.query(
-    "SELECT id, email, timezone, created_at FROM users WHERE id = $1",
+    "SELECT id, email, display_name, timezone, created_at FROM users WHERE id = $1",
     [req.user.id]
   );
   if (result.rowCount === 0) throw new ApiError(401, "Authentication required");

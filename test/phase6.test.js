@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { localToday, nextMidnightInZone, scheduleTodayRollover } from "../src/utils/date.js";
+import fs from "node:fs";
+import path from "node:path";
+import { normalizeDisplayName } from "../src/utils/profile.js";
+import { LOCAL_PROFILE_KEY, readLocalDisplayName, saveLocalDisplayName } from "../src/services/profileStorage.js";
 
 test("configured timezone determines the date independently of the device timezone", () => {
   const instant = new Date("2026-01-01T12:30:00.000Z");
@@ -32,4 +36,45 @@ test("configured-zone midnight spans 23 and 25 hours over daylight-saving change
   assert.equal(nextMidnightInZone("America/New_York", springStart) - springStart, 23 * 60 * 60 * 1000);
   const fallStart = new Date("2026-11-01T04:00:00.000Z");
   assert.equal(nextMidnightInZone("America/New_York", fallStart) - fallStart, 25 * 60 * 60 * 1000);
+});
+
+test("display names normalize safely and local profile names persist outside synced app data", () => {
+  assert.equal(normalizeDisplayName("  A name  "), "A name");
+  assert.equal(normalizeDisplayName("x".repeat(51)), null);
+  assert.equal(normalizeDisplayName("bad\nname"), null);
+
+  const originalStorage = globalThis.localStorage;
+  const values = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key)
+  };
+  try {
+    assert.equal(saveLocalDisplayName("  Local User  "), true);
+    assert.equal(readLocalDisplayName(), "Local User");
+    assert.equal(values.get(LOCAL_PROFILE_KEY), "Local User");
+    assert.equal(saveLocalDisplayName(" "), true);
+    assert.equal(readLocalDisplayName(), "");
+    assert.equal(values.has(LOCAL_PROFILE_KEY), false);
+    assert.equal(saveLocalDisplayName("bad\u0000name"), false);
+  } finally {
+    if (originalStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = originalStorage;
+  }
+});
+
+test("profile presentation does not expose email in the header or greeting", () => {
+  const projectRoot = path.resolve(import.meta.dirname, "..");
+  const topNav = fs.readFileSync(path.join(projectRoot, "src/components/layout/TopNav.jsx"), "utf8");
+  const dashboard = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/DashboardView.jsx"), "utf8");
+  const settings = fs.readFileSync(path.join(projectRoot, "src/components/modals/SettingsModal.jsx"), "utf8");
+  const authModal = fs.readFileSync(path.join(projectRoot, "src/components/modals/AuthModal.jsx"), "utf8");
+
+  assert.equal(topNav.includes("user?.email"), false);
+  assert.equal(topNav.includes("split(\"@\")"), false);
+  assert.equal(dashboard.includes("user.email"), false);
+  assert.ok(dashboard.includes("user?.displayName"));
+  assert.ok(settings.includes("user.email"));
+  assert.ok(authModal.includes("authNameOptional"));
 });

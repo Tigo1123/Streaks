@@ -10,6 +10,7 @@ import { SyncConflictModal } from "./components/modals/SyncConflictModal.jsx";
 import { SyncOnboardingModal } from "./components/modals/SyncOnboardingModal.jsx";
 import { ImportExportModal } from "./components/modals/ImportExportModal.jsx";
 import { TimezoneModal } from "./components/modals/TimezoneModal.jsx";
+import { SettingsModal } from "./components/modals/SettingsModal.jsx";
 import { StorageRecoveryScreen } from "./components/common/StorageRecoveryScreen.jsx";
 import { useStreaks } from "./hooks/useStreaks.js";
 import { useNavigation } from "./hooks/useNavigation.js";
@@ -60,6 +61,7 @@ export function App() {
       <SyncOnboardingModal />
       <ImportExportModal />
       <TimezoneModal />
+      <SettingsModal />
     </>
   );
 }

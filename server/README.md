@@ -43,18 +43,19 @@ Ownership is always derived from the verified JWT; clients must not send a user 
 | Method and path | Authentication | Request | Success |
 | --- | --- | --- | --- |
 | `GET /api/health` | No | — | `200 {"status":"ok"}` |
-| `POST /api/auth/register` | No | `{ "email":"user@example.com", "password":"at-least-8-characters" }` | `201 {"user":{"id":"…","email":"…","timezone":null,"createdAt":"…"},"time":{…}}` |
+| `POST /api/auth/register` | No | `{ "email":"user@example.com", "password":"at-least-8-characters", "displayName":"Optional name" }` | `201 {"user":{"id":"…","email":"…","displayName":null,"timezone":null,"createdAt":"…"},"time":{…}}` |
 | `POST /api/auth/login` | No | Same fields as registration | `200 {"token":"…","refreshToken":"…","user":{…},"time":{…}}`; 30-minute JWT contains only subject and standard time claims |
 | `POST /api/auth/google` | No | `{ "credential":"Google ID token", "password":"optional for linking an existing email account" }` | Same token/user/time shape as password login; `409 GOOGLE_PASSWORD_CONFIRMATION_REQUIRED` asks for the existing account password before linking |
 | `POST /api/auth/refresh` | No | `{ "refreshToken":"…" }` | `200 {"token":"…","refreshToken":"…","user":{…},"time":{…}}`; consumes the presented token and rotates it, with a 30-day sliding expiry |
 | `POST /api/auth/logout` | No | `{ "refreshToken":"…" }` | `204`; revokes the refresh-token family |
-| `GET /api/auth/me` | Yes | — | `200 {"user":{"id":"…","email":"…","timezone":null,"createdAt":"…"},"time":{…}}` |
+| `GET /api/auth/me` | Yes | — | `200 {"user":{"id":"…","email":"…","displayName":null,"timezone":null,"createdAt":"…"},"time":{…}}` |
+| `PATCH /api/auth/profile` | Yes | `{ "displayName":"A name from 1 to 50 characters" }` | `200 {"user":{…}}`; trims whitespace and rejects control characters |
 
 The `time` object includes `today`, `serverNow`, and `nextMidnightAt`, with dates calculated using the user's IANA time zone. A null stored time zone uses UTC until the client sets its browser-detected zone.
 
 The frontend stores its access token, refresh token, and minimal user identity in a dedicated `localStorage` entry so the account survives tab closure and browser restarts. On `/me` returning 401, the frontend attempts one refresh and retries `/me`; only a rejected refresh clears the local session. Requests time out after 90 seconds to allow a sleeping Render service to wake. Network failures, timeouts, and 5xx responses preserve the saved session and trigger a retry with exponential backoff (up to 30 seconds), with a manual retry available in the account panel. The server stores only SHA-256 hashes of refresh tokens; each successful refresh invalidates its predecessor, token reuse revokes the family, and logout revokes the family. Refresh is serialized across same-origin tabs when the browser supports the Web Locks API. Browser storage is readable by page scripts, unlike a backend-set HttpOnly cookie; use HTTPS and protect the static frontend against script injection. Logout never clears the PWA's `streaks-data` localStorage value.
 
-Migrations `005_auth_refresh_sessions.sql` and `006_google_auth.sql` create refresh sessions and add Google identity support; both are applied by `npm run migrate`. Run `cd server && npm run migrate` before deploying the corresponding API versions; the frontend and local challenge-data schema require no database migration.
+Migrations `005_auth_refresh_sessions.sql` and `006_google_auth.sql` create refresh sessions and add Google identity and nullable `display_name` support; both are applied by `npm run migrate`. Run `cd server && npm run migrate` before deploying the corresponding API versions; profile updates reuse the `display_name` column, so this change adds no migration.
 
 ### Challenges
 
