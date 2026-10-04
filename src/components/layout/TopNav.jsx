@@ -6,7 +6,7 @@ import { useNavigation } from "../../hooks/useNavigation.js";
 import { useToast } from "../../hooks/useToast.js";
 import { t } from "../../i18n/index.js";
 
-export function TopNav({ onToggleSidebar }) {
+export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
   const { language, setLanguage } = useStreaks();
   const { user, isAuthenticated, logout } = useAuth();
   const {
@@ -108,8 +108,11 @@ export function TopNav({ onToggleSidebar }) {
         <button
           type="button"
           className="mobile-menu-btn"
+          ref={menuButtonRef}
           onClick={onToggleSidebar}
-          aria-label="Toggle navigation menu"
+          aria-label={t(isSidebarOpen ? "closeNavigationMenu" : "openNavigationMenu", {}, language)}
+          aria-expanded={isSidebarOpen}
+          aria-controls="main-sidebar"
         >
           ☰
         </button>

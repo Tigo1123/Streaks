@@ -416,6 +416,10 @@ html[dir="rtl"] .account-dropdown-menu {
     transform: translateX(0);
   }
 
+  html[dir="rtl"] .sidebar.open {
+    transform: translateX(0);
+  }
+
   .sidebar-backdrop.active {
     display: block;
     opacity: 1;

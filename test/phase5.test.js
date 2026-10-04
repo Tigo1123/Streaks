@@ -10,10 +10,66 @@ import { validImportChallenge, createInitialState, VERSION } from "../src/servic
 import { en } from "../src/i18n/en.js";
 import { ar } from "../src/i18n/ar.js";
 import { completionDistribution } from "../src/utils/statistics.js";
+import { focusFirstSidebarItem, handleSidebarKeyDown } from "../src/utils/sidebarFocus.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
+
+test("Mobile sidebar keyboard handling traps focus and closes with Escape", () => {
+  const doc = { activeElement: null };
+  const makeItem = () => ({
+    hidden: false,
+    getClientRects: () => [{}],
+    focus() {
+      doc.activeElement = this;
+    }
+  });
+  const first = makeItem();
+  const last = makeItem();
+  const drawer = {
+    ownerDocument: doc,
+    querySelectorAll: () => [first, last],
+    contains: (element) => element === first || element === last,
+    focus() {}
+  };
+
+  focusFirstSidebarItem(drawer);
+  assert.equal(doc.activeElement, first);
+
+  doc.activeElement = {};
+  let prevented = false;
+  handleSidebarKeyDown({
+    key: "Tab",
+    shiftKey: false,
+    preventDefault: () => { prevented = true; }
+  }, drawer, () => {});
+  assert.equal(prevented, true);
+  assert.equal(doc.activeElement, first);
+
+  doc.activeElement = first;
+  handleSidebarKeyDown({
+    key: "Tab",
+    shiftKey: true,
+    preventDefault: () => { prevented = true; }
+  }, drawer, () => {});
+  assert.equal(doc.activeElement, last);
+
+  let closed = false;
+  handleSidebarKeyDown({
+    key: "Escape",
+    preventDefault: () => { prevented = true; }
+  }, drawer, () => { closed = true; });
+  assert.equal(closed, true);
+});
+
+test("Sidebar has RTL open-state override and an accessible mobile trigger", () => {
+  const layoutStyles = fs.readFileSync(path.join(projectRoot, "src/styles/layout.css"), "utf8");
+  const shell = fs.readFileSync(path.join(projectRoot, "src/components/layout/TopNav.jsx"), "utf8");
+  assert.ok(layoutStyles.includes('html[dir="rtl"] .sidebar.open {\n    transform: translateX(0);'));
+  assert.ok(shell.includes("aria-expanded={isSidebarOpen}"));
+  assert.ok(shell.includes('aria-controls="main-sidebar"'));
+});
 
 test("Phase 5 - StatCards Calculation Equivalence", () => {
   const challenges = [

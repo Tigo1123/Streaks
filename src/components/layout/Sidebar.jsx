@@ -6,7 +6,7 @@ import { useAuth } from "../../hooks/useAuth.js";
 import { useToast } from "../../hooks/useToast.js";
 import { t } from "../../i18n/index.js";
 
-export function Sidebar({ isOpen, onClose }) {
+export function Sidebar({ isOpen, isMobile = false, onClose, sidebarRef }) {
   const { language } = useStreaks();
   const { status: syncStatus, isRunning: isSyncRunning } = useSync();
   const { currentScreen, goBack, openModal } = useNavigation();
@@ -69,7 +69,14 @@ export function Sidebar({ isOpen, onClose }) {
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside className={`sidebar ${isOpen ? "open" : ""}`} aria-label="Main Navigation">
+      <aside
+        id="main-sidebar"
+        ref={sidebarRef}
+        className={`sidebar ${isOpen ? "open" : ""}`}
+        aria-label={t("mainNavigation", {}, language)}
+        aria-hidden={isMobile && !isOpen}
+        inert={isMobile && !isOpen ? "" : undefined}
+      >
         <div className="sidebar-header">
           <a
             href="#"
