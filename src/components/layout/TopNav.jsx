@@ -27,13 +27,18 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
+  const accountButtonRef = useRef(null);
 
   // Close account menu on click outside or Escape
   useEffect(() => {
     if (!isAccountMenuOpen) return;
 
     const handlePointerDown = (e) => {
-      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target)) {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(e.target) &&
+        !accountButtonRef.current?.contains(e.target)
+      ) {
         setIsAccountMenuOpen(false);
       }
     };
@@ -41,12 +46,15 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         setIsAccountMenuOpen(false);
+        accountButtonRef.current?.focus();
       }
     };
 
+    document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
@@ -173,6 +181,7 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
         <div className="account-nav-wrapper" ref={accountMenuRef}>
           <button
             type="button"
+            ref={accountButtonRef}
             className="btn btn-secondary account-nav-btn"
             onClick={handleAccountClick}
             aria-haspopup="menu"

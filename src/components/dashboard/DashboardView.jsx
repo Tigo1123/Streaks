@@ -45,8 +45,9 @@ export function DashboardView() {
 
   const baseGreeting = getGreeting(language);
   const displayName = isAuthenticated ? user?.displayName || "" : localDisplayName;
-  const greetingText = displayName
-    ? `${baseGreeting}, ${displayName}`
+  const firstName = displayName ? displayName.trim().split(/\s+/)[0] : "";
+  const greetingText = firstName
+    ? `${baseGreeting}, ${firstName}`
     : baseGreeting;
 
   return (

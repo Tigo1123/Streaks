@@ -488,14 +488,26 @@ html[dir="rtl"] .floating-card-content {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.dashboard-header-text {
+  min-inline-size: 0;
+  max-inline-size: 100%;
 }
 
 .dashboard-greeting {
-  font-size: clamp(1.9rem, 4vw, 2.5rem);
-  font-weight: 850;
+  font-size: clamp(1.4rem, 3.2vw, 2.1rem);
+  font-weight: 750;
   color: var(--text-primary);
-  letter-spacing: -0.04em;
-  line-height: 1.15;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-inline-size: 100%;
 }
 
 .dashboard-subheading {
@@ -2747,15 +2759,24 @@ html[dir="rtl"] .landing-page .welcome-hero-headline {
     gap: 20px;
   }
 
+  .dashboard-header,
+  .dashboard-header-text {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+
   .dashboard-header {
     gap: 6px;
   }
 
   .dashboard-greeting {
     margin: 0;
-    font-size: clamp(1.6rem, 7vw, 2rem);
-    line-height: 1.2;
-    overflow-wrap: anywhere;
+    font-size: clamp(1.15rem, 5.2vw, 1.55rem);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-inline-size: 100%;
   }
 
   .dashboard-subheading {

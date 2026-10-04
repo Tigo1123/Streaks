@@ -79,6 +79,27 @@ test("profile presentation does not expose email in the header or greeting", () 
   assert.ok(authModal.includes("authNameOptional"));
 });
 
+test("mobile account menu, greeting, and create action stay readable and reachable", () => {
+  const projectRoot = path.resolve(import.meta.dirname, "..");
+  const topNav = fs.readFileSync(path.join(projectRoot, "src/components/layout/TopNav.jsx"), "utf8");
+  const dashboard = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/DashboardView.jsx"), "utf8");
+  const layoutCss = fs.readFileSync(path.join(projectRoot, "src/styles/layout.css"), "utf8");
+  const componentsCss = fs.readFileSync(path.join(projectRoot, "src/styles/components.css"), "utf8");
+
+  assert.ok(topNav.includes("aria-expanded={isAccountMenuOpen}"));
+  assert.ok(topNav.includes('document.addEventListener("pointerdown", handlePointerDown)'));
+  assert.ok(topNav.includes('if (e.key === "Escape")'));
+  assert.ok(layoutCss.includes("background-color: var(--color-surface-solid)"));
+  assert.ok(layoutCss.includes("z-index: 100"));
+  assert.ok(layoutCss.includes("inset-inline-end: 16px"));
+  assert.ok(layoutCss.includes("inline-size: min(300px, calc(100vw - 32px))"));
+  assert.ok(layoutCss.includes("box-shadow: var(--shadow-sm)"));
+  assert.ok(dashboard.includes("displayName.trim().split(/\\s+/)[0]"));
+  assert.ok(componentsCss.includes("font-size: clamp(1.15rem, 5.2vw, 1.55rem)"));
+  assert.ok(componentsCss.includes("text-overflow: ellipsis"));
+  assert.ok(layoutCss.includes("padding-block-end: calc(108px + env(safe-area-inset-bottom, 0px))"));
+});
+
 test("mobile shell keeps core navigation visible and provides inline vector icons", () => {
   const projectRoot = path.resolve(import.meta.dirname, "..");
   const topNav = fs.readFileSync(path.join(projectRoot, "src/components/layout/TopNav.jsx"), "utf8");
