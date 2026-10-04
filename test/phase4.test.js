@@ -4,7 +4,9 @@ import fs from "node:fs";
 
 import { getApiBaseUrl } from "../src/utils/config.js";
 import { STORAGE_KEY } from "../src/services/storage.js";
-import { AUTH_TOKEN_KEY } from "../src/services/authStorage.js";
+import { handleStorageEvent } from "../src/services/storageEvents.js";
+import { AUTH_SESSION_KEY, AUTH_TOKEN_KEY } from "../src/services/authStorage.js";
+import { SYNC_META_KEY } from "../src/services/sync.js";
 
 // Setup storage mocks
 class MockStorage {
@@ -33,6 +35,60 @@ class MockStorage {
 
 globalThis.localStorage = new MockStorage();
 globalThis.sessionStorage = new MockStorage();
+
+test("storage events update state without backups, cloud sync, or local rewrites", async () => {
+  localStorage.clear();
+  const initial = {
+    version: 1,
+    language: "en",
+    challenges: [],
+    reminders: { enabled: false, lastReminderDate: "" }
+  };
+  const remoteState = { ...initial, language: "ar" };
+  const oldRaw = JSON.stringify(initial);
+  const newRaw = JSON.stringify(remoteState);
+  localStorage.setItem(STORAGE_KEY, newRaw);
+  localStorage.setItem(SYNC_META_KEY, JSON.stringify({ marker: "unchanged" }));
+  const syncMetadataBefore = localStorage.getItem(SYNC_META_KEY);
+  const setItem = localStorage.setItem.bind(localStorage);
+  const originalFetch = Object.getOwnPropertyDescriptor(globalThis, "fetch");
+  let writes = 0;
+  let requests = 0;
+  localStorage.setItem = (...args) => {
+    writes++;
+    return setItem(...args);
+  };
+  globalThis.fetch = (...args) => {
+    requests++;
+    return originalFetch?.value?.(...args) ?? Promise.resolve();
+  };
+
+  try {
+    let updated;
+    const handled = handleStorageEvent(
+      { key: STORAGE_KEY, storageArea: localStorage, oldValue: oldRaw, newValue: newRaw },
+      oldRaw,
+      initial,
+      (result) => { updated = result; }
+    );
+
+    assert.equal(handled, true);
+    assert.equal(updated.ok, true);
+    assert.equal(updated.state.language, "ar");
+    assert.equal(updated.raw, newRaw);
+    assert.equal(writes, 0, "handling an external storage event must not write to localStorage");
+    assert.equal(requests, 0, "handling an external storage event must not start network sync");
+    assert.deepEqual(
+      [...localStorage.store.keys()].filter((key) => key.startsWith(`${STORAGE_KEY}-backup-`)),
+      [],
+      "handling an external storage event must not create backups"
+    );
+    assert.equal(localStorage.getItem(SYNC_META_KEY), syncMetadataBefore, "cloud sync metadata must remain untouched");
+  } finally {
+    if (originalFetch) Object.defineProperty(globalThis, "fetch", originalFetch);
+    else delete globalThis.fetch;
+  }
+});
 
 test("Phase 4 - Production API Resolution Verification", () => {
   // Scenario 1: Production static frontend on Render (https://streaks-p6f7.onrender.com)
@@ -155,16 +211,21 @@ test("Phase 4 - AuthContext Lifecycle & Session Safety", async () => {
   // 1. Initial empty session
   assert.equal(readAuthToken(), null);
 
-  // 2. Token saved in sessionStorage
+  // 2. Token saved persistently in localStorage
   const token = "mock-jwt-token";
   saveAuthToken(token);
   assert.equal(readAuthToken(), token);
-  assert.equal(sessionStorage.getItem(AUTH_TOKEN_KEY), token);
-  assert.equal(localStorage.getItem(AUTH_TOKEN_KEY), null, "Token must NOT touch localStorage");
+  assert.equal(localStorage.getItem(AUTH_SESSION_KEY), JSON.stringify({
+    token,
+    refreshToken: null,
+    user: null
+  }));
+  assert.equal(sessionStorage.getItem(AUTH_TOKEN_KEY), null);
 
   // 3. Clear token (logout / session expiry)
   clearAuthToken();
   assert.equal(readAuthToken(), null);
+  assert.equal(localStorage.getItem(AUTH_SESSION_KEY), null);
   assert.ok(localStorage.getItem(STORAGE_KEY), "Local Streaks data MUST survive logout / auth expiry");
 });
 

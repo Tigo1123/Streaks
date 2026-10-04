@@ -1,10 +1,11 @@
 import React, { createContext, useState, useCallback, useRef, useEffect } from "react";
-import { load, loadRawValue, mutateState, replaceWithInitialState, validImportChallenge, normalizeReminders, VERSION, STORAGE_KEY } from "../services/storage.js";
+import { load, mutateState, replaceWithInitialState, validImportChallenge, normalizeReminders, VERSION } from "../services/storage.js";
 import { migrationUuid } from "../services/sync.js";
 import { progress } from "../utils/streakCalculations.js";
 import { validDate } from "../utils/date.js";
 import { useToast } from "../hooks/useToast.js";
 import { t } from "../i18n/index.js";
+import { handleStorageEvent } from "../services/storageEvents.js";
 
 export const StreaksContext = createContext(null);
 
@@ -49,22 +50,7 @@ export function StreaksProvider({ children }) {
 
   useEffect(() => {
     const handleStorage = (event) => {
-      if (event.key !== STORAGE_KEY || event.storageArea !== localStorage) return;
-      if (event.newValue === loadResult.raw) return;
-
-      let latest;
-      try {
-        latest = loadRawValue(localStorage.getItem(STORAGE_KEY));
-      } catch (error) {
-        latest = {
-          ok: false,
-          state: stateRef.current,
-          raw: null,
-          error: { code: "storage-unavailable", cause: error },
-          quarantinedCount: 0
-        };
-      }
-      updateFromStorage(latest);
+      handleStorageEvent(event, loadResult.raw, stateRef.current, updateFromStorage);
     };
 
     window.addEventListener("storage", handleStorage);

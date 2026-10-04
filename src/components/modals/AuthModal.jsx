@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "../common/Modal.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useSync } from "../../hooks/useSync.js";
@@ -6,15 +6,20 @@ import { useStreaks } from "../../hooks/useStreaks.js";
 import { useNavigation } from "../../hooks/useNavigation.js";
 import { useToast } from "../../hooks/useToast.js";
 import { t } from "../../i18n/index.js";
+import { loadGoogleIdentity, shouldShowGoogleSignIn } from "../../services/googleAuth.js";
 
 export function AuthModal() {
   const {
     isAuthenticated,
+    hasSession,
     user,
     status: authStatus,
+    connectionStatus,
     login,
+    loginWithGoogle,
     register,
     logout,
+    retrySession,
     formErrorKey,
     noticeKey,
     isSubmitting,
@@ -32,8 +37,80 @@ export function AuthModal() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [googleLinkCredential, setGoogleLinkCredential] = useState(null);
+  const [googleLinkPassword, setGoogleLinkPassword] = useState("");
+  const [googleScriptStatus, setGoogleScriptStatus] = useState("idle");
+  const googleButtonRef = useRef(null);
 
   const isOpen = modalMode === "auth";
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || "";
+
+  useEffect(() => {
+    if (!isOpen && googleLinkCredential) {
+      setGoogleLinkCredential(null);
+      setGoogleLinkPassword("");
+    }
+  }, [isOpen, googleLinkCredential]);
+
+  const handleGoogleCredential = useCallback(async (credential) => {
+    const result = await loginWithGoogle(credential);
+    if (result.requiresPassword) {
+      setGoogleLinkCredential(credential);
+      setGoogleLinkPassword("");
+      setLocalError("");
+      return;
+    }
+    if (result.success) {
+      showToast(t("authSuccess", {}, language));
+      closeModal();
+    }
+  }, [loginWithGoogle, showToast, language, closeModal]);
+
+  useEffect(() => {
+    if (!shouldShowGoogleSignIn(googleClientId, authView) || !isOpen || googleLinkCredential) return undefined;
+    let cancelled = false;
+    setGoogleScriptStatus("loading");
+
+    loadGoogleIdentity()
+      .then((googleIdentity) => {
+        if (cancelled || !googleButtonRef.current) return;
+        googleIdentity.initialize({
+          client_id: googleClientId,
+          ux_mode: "popup",
+          callback: ({ credential }) => {
+            if (credential) handleGoogleCredential(credential);
+          }
+        });
+        googleButtonRef.current.replaceChildren();
+        googleIdentity.renderButton(googleButtonRef.current, {
+          type: "standard",
+          theme: "filled_black",
+          size: "large",
+          shape: "pill",
+          text: "continue_with",
+          locale: language === "ar" ? "ar" : "en",
+          width: Math.min(400, Math.max(200, googleButtonRef.current.clientWidth))
+        });
+        setGoogleScriptStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setGoogleScriptStatus("unavailable");
+      });
+
+    return () => { cancelled = true; };
+  }, [googleClientId, isOpen, authView, googleLinkCredential, language, handleGoogleCredential]);
+
+  const handleGoogleLink = async (event) => {
+    event.preventDefault();
+    setLocalError("");
+    const result = await loginWithGoogle(googleLinkCredential, googleLinkPassword);
+    if (result.success) {
+      setGoogleLinkCredential(null);
+      setGoogleLinkPassword("");
+      showToast(t("authSuccess", {}, language));
+      closeModal();
+    }
+  };
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -94,10 +171,11 @@ export function AuthModal() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    showToast(t("authLogoutSuccess", {}, language));
+  const handleLogout = async () => {
+    const revocation = logout();
     closeModal();
+    const result = await revocation;
+    showToast(t(result.revoked ? "authLogoutSuccess" : "authLogoutOffline", {}, language));
   };
 
   const handleStartBackup = () => {
@@ -130,6 +208,16 @@ export function AuthModal() {
         closeLabel={t("authClose", {}, language)}
       >
         <div className="modal-content-stack">
+          {connectionStatus !== "online" && (
+            <div className="form-error-banner" role="status">
+              {t(connectionStatus === "checking" ? "authChecking" : "authOfflineRetry", {}, language)}
+              {connectionStatus === "offline" && (
+                <button type="button" className="btn btn-secondary" onClick={retrySession}>
+                  {t("authRetry", {}, language)}
+                </button>
+              )}
+            </div>
+          )}
           {/* Account Profile / Identity Section with Clear Logout Action */}
           <div className="account-section" aria-label={t("authAccount", {}, language)}>
             <div className="account-user-card">
@@ -196,6 +284,30 @@ export function AuthModal() {
     );
   }
 
+  if (hasSession) {
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={closeModal}
+        title={t("authAccountTitle", {}, language)}
+        dialogClassName="auth-modal-dialog"
+        closeLabel={t("authClose", {}, language)}
+      >
+        <div className="modal-content-stack">
+          <div className="form-error-banner" role="status">
+            {t(connectionStatus === "checking" ? "authChecking" : "authOfflineRetry", {}, language)}
+          </div>
+          <button type="button" className="btn btn-secondary" onClick={retrySession}>
+            {t("authRetry", {}, language)}
+          </button>
+          <button type="button" className="btn btn-danger" onClick={handleLogout}>
+            {t("authLogout", {}, language)}
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
   // Unauthenticated: Login or Register
   const isRegister = authView === "register";
   const modalTitle = t(isRegister ? "authRegisterTitle" : "authLoginTitle", {}, language);
@@ -208,7 +320,7 @@ export function AuthModal() {
       </button>
       <button
         type="submit"
-        form={isRegister ? "registerForm" : "loginForm"}
+        form={googleLinkCredential ? "googleLinkForm" : isRegister ? "registerForm" : "loginForm"}
         className="btn btn-primary auth-submit-btn"
         disabled={isSubmitting}
       >
@@ -219,7 +331,13 @@ export function AuthModal() {
               <span aria-live="polite">{t(isRegister ? "authWorkingRegister" : "authWorkingLogin", {}, language)}</span>
             </>
           )
-          : t(isRegister ? "authCreateAccount" : "authLogin", {}, language)}
+          : t(
+            googleLinkCredential
+              ? "authGoogleLinkConfirm"
+              : isRegister ? "authCreateAccount" : "authLogin",
+            {},
+            language
+          )}
       </button>
     </>
   );
@@ -235,6 +353,71 @@ export function AuthModal() {
     >
       <div className="modal-content-stack">
         <p className="modal-subtitle">{modalSubtitle}</p>
+
+        {googleLinkCredential ? (
+          <>
+            <p className="modal-subtitle">{t("authGoogleLinkPrompt", {}, language)}</p>
+            <form id="googleLinkForm" onSubmit={handleGoogleLink} className="modal-form">
+              <div className="form-group">
+                <label htmlFor="googleLinkPassword" className="form-label">
+                  {t("authGoogleLinkPassword", {}, language)}
+                </label>
+                <input
+                  id="googleLinkPassword"
+                  type="password"
+                  className="form-input"
+                  required
+                  autoComplete="current-password"
+                  value={googleLinkPassword}
+                  onChange={(event) => setGoogleLinkPassword(event.target.value)}
+                  disabled={isSubmitting}
+                  autoFocus
+                />
+              </div>
+            </form>
+            {formErrorKey && (
+              <div className="form-error" role="alert">
+                {t(formErrorKey, {}, language)}
+              </div>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setGoogleLinkCredential(null);
+                setGoogleLinkPassword("");
+                clearErrors();
+              }}
+              disabled={isSubmitting}
+            >
+              {t("authGoogleLinkCancel", {}, language)}
+            </button>
+          </>
+        ) : (
+          <>
+            {shouldShowGoogleSignIn(googleClientId, authView) && (
+              <div className="google-auth-wrap">
+                {googleScriptStatus === "loading" && (
+                  <p className="google-auth-status" role="status">
+                    <span className="auth-loading-indicator" aria-hidden="true" />
+                    {t("authGoogleLoading", {}, language)}
+                  </p>
+                )}
+                {googleScriptStatus === "unavailable" && (
+                  <p className="google-auth-status" role="status">
+                    {t("authGoogleUnavailable", {}, language)}
+                  </p>
+                )}
+                <div
+                  ref={googleButtonRef}
+                  className="google-auth-button"
+                  aria-hidden={googleScriptStatus !== "ready"}
+                />
+                <div className="google-auth-divider" aria-hidden="true">
+                  <span>{t("authOr", {}, language)}</span>
+                </div>
+              </div>
+            )}
 
         {noticeKey && (
           <div className="form-notice" role="status">
@@ -355,6 +538,8 @@ export function AuthModal() {
             {t(isRegister ? "authAlreadyAccount" : "authNeedAccount", {}, language)}
           </button>
         </div>
+          </>
+        )}
       </div>
     </Modal>
   );

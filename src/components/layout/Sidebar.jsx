@@ -54,10 +54,10 @@ export function Sidebar({ isOpen, onClose }) {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     onClose?.();
-    logout();
-    showToast(t("authLogoutSuccess", {}, language) || (isRtl ? "تم تسجيل الخروج" : "Signed out"));
+    const result = await logout();
+    showToast(t(result.revoked ? "authLogoutSuccess" : "authLogoutOffline", {}, language) || (isRtl ? "تم تسجيل الخروج" : "Signed out"));
   };
 
   const isRtl = language === "ar";

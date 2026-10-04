@@ -27,6 +27,8 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
   const app = require("../src/app");
   const pool = require("../src/db/pool");
   const { runMigrations } = require("../src/db/migrate");
+  const { createGoogleAuthHandler } = require("../src/routes/auth");
+  const crypto = require("node:crypto");
 
   await runMigrations();
   await pool.query("TRUNCATE users CASCADE");
@@ -46,6 +48,30 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
+  const invokeGoogleHandler = async (handler, body) => {
+    let status = 200;
+    let payload;
+    const response = {
+      status(code) {
+        status = code;
+        return this;
+      },
+      json(value) {
+        payload = value;
+        return this;
+      }
+    };
+    try {
+      await handler({ body }, response);
+    } catch (error) {
+      status = error.status || 500;
+      payload = {
+        error: error.message,
+        ...(error.code ? { code: error.code } : {})
+      };
+    }
+    return { status, payload };
+  };
 
   await t.test("valid registration normalizes email and stores only a bcrypt hash", async () => {
     const response = await postJson("/api/auth/register", {
@@ -82,11 +108,150 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(typeof body.token, "string");
+    assert.equal(typeof body.refreshToken, "string");
     const claims = jwt.decode(body.token);
     assert.equal(claims.sub, body.user.id);
+    assert.equal(claims.exp - claims.iat, 30 * 60);
     assert.equal("email" in claims, false);
     assert.equal("password" in claims, false);
     assert.equal("password_hash" in claims, false);
+  });
+
+  await t.test("refresh tokens rotate once and logout revokes the token family", async () => {
+    const login = await postJson("/api/auth/login", {
+      email: "test.user@example.com",
+      password: "correct horse battery"
+    });
+    const first = await login.json();
+    const rotatedResponse = await postJson("/api/auth/refresh", { refreshToken: first.refreshToken });
+    assert.equal(rotatedResponse.status, 200);
+    const rotated = await rotatedResponse.json();
+    assert.notEqual(rotated.refreshToken, first.refreshToken);
+    assert.equal(jwt.decode(rotated.token).sub, first.user.id);
+
+    const replay = await postJson("/api/auth/refresh", { refreshToken: first.refreshToken });
+    assert.equal(replay.status, 401);
+    const revokedByReplay = await postJson("/api/auth/refresh", { refreshToken: rotated.refreshToken });
+    assert.equal(revokedByReplay.status, 401);
+
+    const logoutLogin = await postJson("/api/auth/login", {
+      email: "test.user@example.com",
+      password: "correct horse battery"
+    });
+    const logoutSession = await logoutLogin.json();
+    const logout = await postJson("/api/auth/logout", { refreshToken: logoutSession.refreshToken });
+    assert.equal(logout.status, 204);
+    const afterLogout = await postJson("/api/auth/refresh", { refreshToken: logoutSession.refreshToken });
+    assert.equal(afterLogout.status, 401);
+  });
+
+  await t.test("Google login creates accounts, reuses subject identity, and securely links password accounts", async () => {
+    const clientId = "google-integration-client";
+    const identities = {
+      create: {
+        iss: "https://accounts.google.com",
+        aud: clientId,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        email_verified: true,
+        sub: "google-integration-sub-1",
+        email: "google.only@example.com",
+        name: "Google User"
+      },
+      link: {
+        iss: "accounts.google.com",
+        aud: clientId,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        email_verified: true,
+        sub: "google-integration-sub-2",
+        email: "link.existing@example.com",
+        name: "Linked User"
+      }
+    };
+    const handler = createGoogleAuthHandler({
+      database: pool,
+      authConfig: { googleClientId: clientId },
+      verifyCredential: async (credential, audience) => {
+        assert.equal(audience, clientId);
+        return identities[credential];
+      }
+    });
+
+    const created = await invokeGoogleHandler(handler, { credential: "create" });
+    assert.equal(created.status, 200);
+    assert.equal(typeof created.payload.token, "string");
+    assert.equal(typeof created.payload.refreshToken, "string");
+    const googleUserId = created.payload.user.id;
+    const createdUser = await pool.query(
+      "SELECT email, password_hash, google_sub, display_name FROM users WHERE id = $1",
+      [googleUserId]
+    );
+    assert.equal(createdUser.rows[0].email, "google.only@example.com");
+    assert.equal(createdUser.rows[0].password_hash, null);
+    assert.equal(createdUser.rows[0].google_sub, identities.create.sub);
+    assert.equal(createdUser.rows[0].display_name, "Google User");
+
+    const repeated = await invokeGoogleHandler(handler, { credential: "create" });
+    assert.equal(repeated.status, 200);
+    assert.equal(repeated.payload.user.id, googleUserId);
+
+    const googlePasswordLogin = await postJson("/api/auth/login", {
+      email: "google.only@example.com",
+      password: "some password"
+    });
+    const unknownPasswordLogin = await postJson("/api/auth/login", {
+      email: "no.account@example.com",
+      password: "some password"
+    });
+    assert.equal(googlePasswordLogin.status, 401);
+    assert.deepEqual(await googlePasswordLogin.json(), await unknownPasswordLogin.json());
+
+    await postJson("/api/auth/register", {
+      email: "link.existing@example.com",
+      password: "correct horse battery"
+    });
+    const existingLogin = await postJson("/api/auth/login", {
+      email: "link.existing@example.com",
+      password: "correct horse battery"
+    });
+    const existingSession = await existingLogin.json();
+
+    const confirmation = await invokeGoogleHandler(handler, { credential: "link" });
+    assert.equal(confirmation.status, 409);
+    assert.equal(confirmation.payload.code, "GOOGLE_PASSWORD_CONFIRMATION_REQUIRED");
+
+    const failedLink = await invokeGoogleHandler(handler, {
+      credential: "link",
+      password: "wrong password"
+    });
+    assert.equal(failedLink.status, 401);
+    const notLinked = await pool.query(
+      "SELECT google_sub FROM users WHERE email = $1",
+      ["link.existing@example.com"]
+    );
+    assert.equal(notLinked.rows[0].google_sub, null);
+
+    const linked = await invokeGoogleHandler(handler, {
+      credential: "link",
+      password: "correct horse battery"
+    });
+    assert.equal(linked.status, 200);
+    assert.equal(linked.payload.user.id, existingSession.user.id);
+    const tokenHash = (value) => crypto.createHash("sha256").update(value).digest("hex");
+    const previousSession = await pool.query(
+      "SELECT revoked_at FROM auth_refresh_sessions WHERE token_hash = $1",
+      [tokenHash(existingSession.refreshToken)]
+    );
+    assert.ok(previousSession.rows[0].revoked_at, "the prior refresh token is revoked when linking");
+    const currentSession = await pool.query(
+      "SELECT revoked_at FROM auth_refresh_sessions WHERE token_hash = $1",
+      [tokenHash(linked.payload.refreshToken)]
+    );
+    assert.equal(currentSession.rows[0].revoked_at, null);
+    const linkResult = await pool.query(
+      "SELECT google_sub FROM users WHERE id = $1",
+      [existingSession.user.id]
+    );
+    assert.equal(linkResult.rows[0].google_sub, identities.link.sub);
   });
 
   await t.test("/me requires a valid, non-expired bearer token and returns safe data", async () => {
@@ -115,9 +280,9 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = current_schema()
          AND table_name = ANY($1::text[])`,
-      [["users", "challenges", "completions", "notes", "preferences", "sync_tombstones"]]
+      [["users", "challenges", "completions", "notes", "preferences", "sync_tombstones", "auth_refresh_sessions"]]
     );
-    assert.equal(tables.rowCount, 6);
+    assert.equal(tables.rowCount, 7);
 
     const challenge = await pool.query(
       `INSERT INTO challenges (user_id, title, duration, start_date)
@@ -147,7 +312,7 @@ test("authentication and schema integration (requires TEST_DATABASE_URL)", {
       (error) => error.code === "23514"
     );
     await pool.query("DELETE FROM users WHERE id = $1", [userId]);
-    for (const table of ["challenges", "completions", "notes", "preferences", "sync_tombstones"]) {
+    for (const table of ["challenges", "completions", "notes", "preferences", "sync_tombstones", "auth_refresh_sessions"]) {
       const remaining = await pool.query(`SELECT count(*)::int AS count FROM ${table}`);
       assert.equal(remaining.rows[0].count, 0, `${table} should cascade when its user is deleted`);
     }

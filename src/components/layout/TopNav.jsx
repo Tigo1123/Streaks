@@ -65,10 +65,10 @@ export function TopNav({ onToggleSidebar }) {
     setIsAccountMenuOpen((prev) => !prev);
   };
 
-  const handleMenuLogout = () => {
+  const handleMenuLogout = async () => {
     setIsAccountMenuOpen(false);
-    logout();
-    showToast(t("authLogoutSuccess", {}, language) || (isRtl ? "تم تسجيل الخروج" : "Signed out"));
+    const result = await logout();
+    showToast(t(result.revoked ? "authLogoutSuccess" : "authLogoutOffline", {}, language) || (isRtl ? "تم تسجيل الخروج" : "Signed out"));
   };
 
   const handleOpenAccountModal = () => {

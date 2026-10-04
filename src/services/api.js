@@ -13,6 +13,7 @@ export { getApiBaseUrl };
  * @param {any} [options.body] - Request body object to be JSON serialized
  * @param {Record<string, string>} [options.headers={}] - Custom headers (e.g. If-Match, If-None-Match)
  * @param {AbortSignal} [options.signal] - Abort controller signal
+ * @param {number} [options.timeoutMs=90000] - Request timeout in milliseconds
  * @returns {Promise<{ response: Response, payload: any }>}
  */
 export async function authRequest(path, {
@@ -20,7 +21,8 @@ export async function authRequest(path, {
   token,
   body,
   headers: extraHeaders = {},
-  signal
+  signal,
+  timeoutMs = 90000
 } = {}) {
   const baseUrl = getApiBaseUrl();
   const headers = { Accept: "application/json", ...extraHeaders };
@@ -33,20 +35,33 @@ export async function authRequest(path, {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: "no-store",
-    signal
-  });
-
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch (_) {
-    // If response has no JSON body (or is 204 No Content), payload remains null
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(signal.reason);
+  if (signal) {
+    if (signal.aborted) abortFromCaller();
+    else signal.addEventListener("abort", abortFromCaller, { once: true });
   }
+  const timeoutId = setTimeout(() => controller.abort(new DOMException("Request timed out", "TimeoutError")), timeoutMs);
 
-  return { response, payload };
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_) {
+      // If response has no JSON body (or is 204 No Content), payload remains null
+    }
+
+    return { response, payload };
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", abortFromCaller);
+  }
 }

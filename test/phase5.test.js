@@ -266,8 +266,9 @@ test("Phase 5 - Dark Design System Token Integrity", () => {
   assert.ok(modalsCss.includes(".modal-backdrop"), "modal-backdrop present");
   assert.ok(modalsCss.includes(".modal-dialog"), "modal-dialog present");
   assert.ok(modalsCss.includes("@supports not (backdrop-filter: blur(1px))"), "Modal glass has a solid fallback");
-  assert.ok(serviceWorker.includes('streaks-shell-v7'), "Service worker shell cache version was advanced");
+  assert.ok(serviceWorker.includes('streaks-shell-v8'), "Service worker shell cache version was advanced");
   assert.ok(serviceWorker.includes('fonts/manrope-latin.woff2'), "Self-hosted fonts are cached for offline use");
+  assert.ok(serviceWorker.includes('url.hostname === "accounts.google.com"'), "Google Identity Services is never handled by the service worker cache");
 });
 
 test("Phase 6 - Dashboard progress rings are accessible and shared across cards", () => {

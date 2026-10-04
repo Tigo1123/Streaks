@@ -282,6 +282,54 @@
   min-width: 148px;
 }
 
+.google-auth-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.google-auth-button {
+  min-height: 40px;
+  display: flex;
+  justify-content: center;
+}
+
+.google-auth-button[aria-hidden="true"] {
+  display: none;
+}
+
+.google-auth-button iframe {
+  max-width: 100%;
+}
+
+.google-auth-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-align: center;
+  margin: 0;
+}
+
+.google-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.google-auth-divider::before,
+.google-auth-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border-card);
+}
+
 .auth-loading-indicator {
   width: 16px;
   height: 16px;

@@ -8,7 +8,7 @@ import { useTimezone } from "../hooks/useTimezone.js";
 export const SyncContext = createContext(null);
 
 export function SyncProvider({ children }) {
-  const { token, user, isAuthenticated, logout } = useAuth();
+  const { token, user, isAuthenticated, restoreSession } = useAuth();
   const { reloadFromStorage } = useStreaks();
   const { today, ensureServerTimezone, refreshServerTime, acceptServerTime, adoptServerTimezone } = useTimezone();
 
@@ -98,13 +98,13 @@ export function SyncProvider({ children }) {
       setStatus(key === "syncOffline" ? "offline" : "error");
 
       if (err?.status === 401) {
-        logout();
+        await restoreSession();
       }
     } finally {
       setIsRunning(false);
       abortControllerRef.current = null;
     }
-  }, [isRunning, isAuthenticated, token, user?.id, decisions, reloadFromStorage, logout, ensureServerTimezone, refreshServerTime, acceptServerTime, adoptServerTimezone, today]);
+  }, [isRunning, isAuthenticated, token, user?.id, decisions, reloadFromStorage, restoreSession, ensureServerTimezone, refreshServerTime, acceptServerTime, adoptServerTimezone, today]);
 
   const resolveConflict = useCallback((key, side) => {
     if (!["local", "cloud"].includes(side)) return;

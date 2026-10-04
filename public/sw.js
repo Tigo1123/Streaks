@@ -1,4 +1,4 @@
-const CACHE_NAME = "streaks-shell-v7";
+const CACHE_NAME = "streaks-shell-v8";
 const CACHE_PREFIX = "streaks-shell-";
 const scopeUrl = new URL(self.registration.scope);
 const indexUrl = new URL("index.html", scopeUrl);
@@ -54,6 +54,8 @@ self.addEventListener("fetch", (event) => {
   if (
     request.method !== "GET" ||
     /streaks-api/i.test(url.hostname) ||
+    url.hostname === "accounts.google.com" ||
+    url.hostname.endsWith(".google.com") ||
     url.origin !== scopeUrl.origin
   ) {
     return;

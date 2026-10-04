@@ -5,7 +5,10 @@ function errorHandler(error, req, res, next) {
   if (res.headersSent) return next(error);
 
   if (error instanceof ApiError) {
-    return res.status(error.status).json({ error: error.message });
+    return res.status(error.status).json({
+      error: error.message,
+      ...(error.code ? { code: error.code } : {})
+    });
   }
 
   if (error.type === "entity.too.large") {

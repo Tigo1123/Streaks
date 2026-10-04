@@ -27,15 +27,17 @@ Each account stores an IANA time zone. When the account service is reachable, th
 
 ## Accounts and local data
 
-Streaks has an optional account interface for registration, login, session checks, and logout. The account API uses the independent Express/PostgreSQL backend in [`server/`](server/README.md). Challenge data, notes, completions, reminders, language, Import/Export, and offline operation remain local to this browser. Logging out only clears the account token; it does not alter local Streaks data.
+Streaks has an optional account interface for registration, email/password login, Google sign-in, session checks, and logout. Google sign-in uses the public `VITE_GOOGLE_CLIENT_ID` frontend build variable; copy `.env.example` to `.env.local` for local builds. The account API uses the independent Express/PostgreSQL backend in [`server/`](server/README.md). Challenge data, notes, completions, reminders, language, Import/Export, and offline operation remain local to this browser. Logging out only clears the account session; it does not alter local Streaks data.
 
 ### Configure the API URL
 
 The frontend uses one API base URL setting: the `streaks-api-base-url` meta tag in `index.html`. Leave its content empty for local development: a page served from `localhost` or `127.0.0.1` uses `http://<same-host>:10000`, and a frontend served on port `8080` also targets port `10000` on the same host. The Express backend defaults to port `10000` (`PORT` can override it). Serve the page over HTTP for account requests (for example, `python3 -m http.server 8080` from the project root); browsers restrict API calls from a `file://` page. On a production static deployment where the API is a separate service, set the tag's content to the API's public HTTPS origin, for example `https://your-streaks-api.onrender.com` (origin only, with no `/api` suffix), before deploying the static site. The API origin is public configuration, not a secret.
 
-Set the backend `CORS_ORIGIN` to the exact local frontend origin during development and the exact Render Static Site origin in production. See [`server/README.md`](server/README.md) for backend configuration and routes.
+Set the backend `CORS_ORIGIN` to the exact local frontend origin during development and the exact Render Static Site origin in production. Google sign-in additionally requires `GOOGLE_CLIENT_ID` on the backend and `VITE_GOOGLE_CLIENT_ID` during the frontend build. See [`server/README.md`](server/README.md) for backend configuration and routes.
 
-The JWT is kept under a dedicated `sessionStorage` key. It survives page refreshes within the tab and is cleared on logout or a confirmed expired/invalid session. It is not stored with the `streaks-data` local challenge record. Browser JavaScript storage cannot provide the protection of a backend-set HttpOnly cookie, so a same-origin script injection could access this token; keep the page's scripts trusted and the deployment HTTPS-only. If the account service is offline, local Streaks remains usable and an unverified saved token is retained for a later session check.
+The access token, rotating refresh token, and minimal account identity are stored in a dedicated `localStorage` entry, separate from the `streaks-data` local challenge record. Access tokens expire after 30 minutes; refresh tokens rotate and expire after 30 days of inactivity. A confirmed invalid/expired refresh token or explicit logout clears the local account session. Network errors, timeouts, and server errors retain it for retry. Browser JavaScript storage cannot provide the protection of a backend-set HttpOnly cookie, so a same-origin script injection could access these tokens; keep the page's scripts trusted and the deployment HTTPS-only. The API stores only hashes of refresh tokens and revokes a token family on logout or detected token reuse.
+
+The API schema includes the `auth_refresh_sessions` table. Apply pending database migrations with `cd server && npm run migrate` before deploying backend changes. Local Streaks data and its schema are unchanged.
 
 ### Manual cloud backup
 

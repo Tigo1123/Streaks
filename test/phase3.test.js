@@ -41,12 +41,21 @@ import {
   commitIfUnchanged
 } from "../src/services/storage.js";
 import {
+  AUTH_SESSION_KEY,
   AUTH_TOKEN_KEY,
   readAuthToken,
-  saveAuthToken,
+  readAuthSession,
+  saveAuthSession,
   clearAuthToken,
   validAuthUser
 } from "../src/services/authStorage.js";
+import { restoreAuthSession } from "../src/services/authSession.js";
+import {
+  completeGoogleLogin,
+  GOOGLE_IDENTITY_SCRIPT_URL,
+  loadGoogleIdentity,
+  shouldShowGoogleSignIn
+} from "../src/services/googleAuth.js";
 import {
   SYNC_META_KEY,
   SYNC_UUID_PATTERN,
@@ -163,8 +172,8 @@ test("1. i18n Translation Dictionary Equivalence", () => {
   const vanillaEnKeys = Object.keys(vanilla.i18n.en);
   const vanillaArKeys = Object.keys(vanilla.i18n.ar);
 
-  assert.equal(enKeys.length, 209, "English key count must include timezone, chart, landing, auth, and distribution labels");
-  assert.equal(arKeys.length, 209, "Arabic key count must include timezone, chart, landing, auth, and distribution labels");
+  assert.equal(enKeys.length, 221, "English key count must include timezone, chart, landing, auth, Google, and distribution labels");
+  assert.equal(arKeys.length, 221, "Arabic key count must include timezone, chart, landing, auth, Google, and distribution labels");
   assert.equal(vanillaEnKeys.length, 183);
   assert.equal(vanillaArKeys.length, 183);
 
@@ -568,22 +577,187 @@ test("Invalid challenge is quarantined while two valid challenges load", () => {
   ));
 });
 
-test("5. Auth Storage - sessionStorage Isolation", () => {
+test("5. Auth Storage - persistent localStorage session", () => {
   sessionStorage.clear();
+  localStorage.removeItem(AUTH_SESSION_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
   assert.equal(readAuthToken(), null);
 
   const testToken = "jwt.header.payload.signature";
-  assert.equal(saveAuthToken(testToken), true);
+  const testSession = {
+    token: testToken,
+    refreshToken: "opaque-refresh-token",
+    user: { id: "user-1", email: "test@example.com", timezone: "Africa/Khartoum" }
+  };
+  assert.equal(saveAuthSession(testSession), true);
   assert.equal(readAuthToken(), testToken);
-  assert.equal(sessionStorage.getItem(AUTH_TOKEN_KEY), testToken);
-  assert.equal(localStorage.getItem(AUTH_TOKEN_KEY), null, "Token must NOT be in localStorage");
+  assert.deepEqual(readAuthSession(), testSession);
+  assert.equal(localStorage.getItem(AUTH_SESSION_KEY), JSON.stringify(testSession));
+  assert.equal(sessionStorage.getItem(AUTH_TOKEN_KEY), null);
 
   clearAuthToken();
   assert.equal(readAuthToken(), null);
+  assert.equal(localStorage.getItem(AUTH_SESSION_KEY), null);
+
+  sessionStorage.setItem(AUTH_TOKEN_KEY, testToken);
+  assert.equal(readAuthToken(), testToken);
+  assert.equal(localStorage.getItem(AUTH_SESSION_KEY), JSON.stringify({
+    token: testToken,
+    refreshToken: null,
+    user: null
+  }), "A legacy session token is migrated to persistent storage");
+  assert.equal(sessionStorage.getItem(AUTH_TOKEN_KEY), null);
 
   assert.equal(validAuthUser({ id: "user-1", email: "test@example.com" }), true);
+  assert.equal(validAuthUser({ id: "user-1", email: "test@example.com", timezone: "Africa/Khartoum" }), true);
   assert.equal(validAuthUser({ id: "user-1", email: "a".repeat(300) }), false);
   assert.equal(validAuthUser(null), false);
+});
+
+test("Auth session restores after reload and rotates tokens after a 401", async () => {
+  const initialSession = {
+    token: "expired-access-token",
+    refreshToken: "valid-refresh-token",
+    user: { id: "user-1", email: "test@example.com" }
+  };
+  saveAuthSession(initialSession);
+  const calls = [];
+  const request = async (path, options = {}) => {
+    calls.push({ path, options });
+    if (path === "/api/auth/me" && calls.length === 1) {
+      return { response: { status: 401, ok: false }, payload: null };
+    }
+    if (path === "/api/auth/refresh") {
+      return {
+        response: { status: 200, ok: true },
+        payload: {
+          token: "new-access-token",
+          refreshToken: "new-refresh-token",
+          user: { id: "user-1", email: "test@example.com", timezone: "Africa/Khartoum" }
+        }
+      };
+    }
+    return {
+      response: { status: 200, ok: true },
+      payload: {
+        user: { id: "user-1", email: "test@example.com", timezone: "Africa/Khartoum", addedLater: true },
+        time: { today: "2026-10-04" }
+      }
+    };
+  };
+
+  const restored = await restoreAuthSession(readAuthSession(), request);
+  assert.equal(restored.kind, "authenticated");
+  assert.equal(restored.session.token, "new-access-token");
+  assert.equal(restored.session.refreshToken, "new-refresh-token");
+  assert.equal(restored.session.user.addedLater, true);
+  assert.deepEqual(calls.map((call) => call.path), [
+    "/api/auth/me",
+    "/api/auth/refresh",
+    "/api/auth/me"
+  ]);
+  assert.equal(readAuthSession().token, "new-access-token");
+});
+
+test("A 401 from refresh ends the saved session", async () => {
+  saveAuthSession({
+    token: "expired-access-token",
+    refreshToken: "expired-refresh-token",
+    user: { id: "user-1", email: "test@example.com" }
+  });
+  const restored = await restoreAuthSession(readAuthSession(), async (path) => ({
+    response: { status: 401, ok: false },
+    payload: null
+  }));
+  assert.equal(restored.kind, "expired");
+  assert.equal(readAuthSession(), null);
+});
+
+test("A network failure during restore preserves the saved session", async () => {
+  const saved = {
+    token: "still-valid-access-token",
+    refreshToken: "still-valid-refresh-token",
+    user: { id: "user-1", email: "test@example.com" }
+  };
+  saveAuthSession(saved);
+  const restored = await restoreAuthSession(readAuthSession(), async () => {
+    throw new TypeError("Failed to fetch");
+  });
+  assert.equal(restored.kind, "unavailable");
+  assert.deepEqual(readAuthSession(), saved);
+});
+
+test("A server error during restore preserves the saved session", async () => {
+  const saved = {
+    token: "still-valid-access-token",
+    refreshToken: "still-valid-refresh-token",
+    user: { id: "user-1", email: "test@example.com" }
+  };
+  saveAuthSession(saved);
+  const restored = await restoreAuthSession(readAuthSession(), async () => ({
+    response: { status: 503, ok: false },
+    payload: null
+  }));
+  assert.equal(restored.kind, "unavailable");
+  assert.deepEqual(readAuthSession(), saved);
+});
+
+test("Google sign-in stays hidden without a client ID or outside the login view", () => {
+  assert.equal(shouldShowGoogleSignIn("", "login"), false);
+  assert.equal(shouldShowGoogleSignIn(undefined, "login"), false);
+  assert.equal(shouldShowGoogleSignIn("public-client-id", "register"), false);
+  assert.equal(shouldShowGoogleSignIn("public-client-id", "login"), true);
+});
+
+test("Google Identity script load failures remain recoverable", async () => {
+  const listeners = {};
+  const script = {
+    src: "",
+    isConnected: false,
+    addEventListener: (name, callback) => { listeners[name] = callback; },
+    removeEventListener: (name) => { delete listeners[name]; }
+  };
+  const documentObject = {
+    querySelector: () => null,
+    createElement: () => script,
+    head: { appendChild: () => {} }
+  };
+  const load = loadGoogleIdentity({ documentObject, windowObject: {} });
+  assert.equal(script.src, GOOGLE_IDENTITY_SCRIPT_URL);
+  listeners.error();
+  await assert.rejects(load, /could not be loaded/);
+});
+
+test("Google login sends a credential and saves the returned shared session", async () => {
+  localStorage.removeItem(AUTH_SESSION_KEY);
+  let accepted = false;
+  const result = await completeGoogleLogin({
+    credential: "signed-google-credential",
+    request: async (path, options) => {
+      assert.equal(path, "/api/auth/google");
+      assert.deepEqual(options.body, { credential: "signed-google-credential" });
+      return {
+        response: { status: 200, ok: true },
+        payload: {
+          token: "google-access-token",
+          refreshToken: "google-refresh-token",
+          user: { id: "google-user", email: "google@example.com" }
+        }
+      };
+    },
+    acceptSession: (payload) => {
+      accepted = saveAuthSession({
+        token: payload.token,
+        refreshToken: payload.refreshToken,
+        user: payload.user
+      });
+      return { success: true };
+    }
+  });
+  assert.equal(result.success, true);
+  assert.equal(accepted, true);
+  assert.equal(readAuthSession().token, "google-access-token");
+  assert.equal(readAuthSession().refreshToken, "google-refresh-token");
 });
 
 test("6. Cloud Sync - Snapshot Validation and 3-Way Merge", async () => {

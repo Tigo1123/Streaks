@@ -65,6 +65,9 @@ function loadConfig(source = process.env) {
     port,
     databaseUrl,
     jwtSecret,
+    googleClientId: typeof source.GOOGLE_CLIENT_ID === "string" && source.GOOGLE_CLIENT_ID.trim()
+      ? source.GOOGLE_CLIENT_ID.trim()
+      : null,
     corsOrigins: parseOrigins(source.CORS_ORIGIN),
     nodeEnv
   });

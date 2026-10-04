@@ -44,12 +44,17 @@ Ownership is always derived from the verified JWT; clients must not send a user 
 | --- | --- | --- | --- |
 | `GET /api/health` | No | — | `200 {"status":"ok"}` |
 | `POST /api/auth/register` | No | `{ "email":"user@example.com", "password":"at-least-8-characters" }` | `201 {"user":{"id":"…","email":"…","timezone":null,"createdAt":"…"},"time":{…}}` |
-| `POST /api/auth/login` | No | Same fields as registration | `200 {"token":"…","user":{…},"time":{…}}`; one-hour JWT contains only subject and standard time claims |
+| `POST /api/auth/login` | No | Same fields as registration | `200 {"token":"…","refreshToken":"…","user":{…},"time":{…}}`; 30-minute JWT contains only subject and standard time claims |
+| `POST /api/auth/google` | No | `{ "credential":"Google ID token", "password":"optional for linking an existing email account" }` | Same token/user/time shape as password login; `409 GOOGLE_PASSWORD_CONFIRMATION_REQUIRED` asks for the existing account password before linking |
+| `POST /api/auth/refresh` | No | `{ "refreshToken":"…" }` | `200 {"token":"…","refreshToken":"…","user":{…},"time":{…}}`; consumes the presented token and rotates it, with a 30-day sliding expiry |
+| `POST /api/auth/logout` | No | `{ "refreshToken":"…" }` | `204`; revokes the refresh-token family |
 | `GET /api/auth/me` | Yes | — | `200 {"user":{"id":"…","email":"…","timezone":null,"createdAt":"…"},"time":{…}}` |
 
 The `time` object includes `today`, `serverNow`, and `nextMidnightAt`, with dates calculated using the user's IANA time zone. A null stored time zone uses UTC until the client sets its browser-detected zone.
 
-The frontend keeps the one-hour JWT in a dedicated `sessionStorage` entry so a page refresh in the same tab can restore the account with `/api/auth/me`. The token is removed on logout or when `/me` confirms it is invalid. If `/me` cannot reach the server, the token is retained for retry while local Streaks stays usable. Browser storage is readable by page scripts, unlike a backend-set HttpOnly cookie; use HTTPS and protect the static frontend against script injection. Logout never clears the PWA's `streaks-data` localStorage value.
+The frontend stores its access token, refresh token, and minimal user identity in a dedicated `localStorage` entry so the account survives tab closure and browser restarts. On `/me` returning 401, the frontend attempts one refresh and retries `/me`; only a rejected refresh clears the local session. Requests time out after 90 seconds to allow a sleeping Render service to wake. Network failures, timeouts, and 5xx responses preserve the saved session and trigger a retry with exponential backoff (up to 30 seconds), with a manual retry available in the account panel. The server stores only SHA-256 hashes of refresh tokens; each successful refresh invalidates its predecessor, token reuse revokes the family, and logout revokes the family. Refresh is serialized across same-origin tabs when the browser supports the Web Locks API. Browser storage is readable by page scripts, unlike a backend-set HttpOnly cookie; use HTTPS and protect the static frontend against script injection. Logout never clears the PWA's `streaks-data` localStorage value.
+
+Migrations `005_auth_refresh_sessions.sql` and `006_google_auth.sql` create refresh sessions and add Google identity support; both are applied by `npm run migrate`. Run `cd server && npm run migrate` before deploying the corresponding API versions; the frontend and local challenge-data schema require no database migration.
 
 ### Challenges
 
@@ -131,4 +136,4 @@ Build Command: npm install
 Start Command: npm start
 ```
 
-Set `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, and `NODE_ENV=production` as service environment variables. Use a persistent PostgreSQL plan appropriate for the expected retention; this repository does not assume a particular pricing tier. No deployment or database resource is created by this phase.
+Set `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, and `NODE_ENV=production` as service environment variables. For Google sign-in, also set `GOOGLE_CLIENT_ID` to the public OAuth web client ID; it is optional, and Google sign-in returns `503` while it is unset without preventing the API from starting. Configure the same client ID as `VITE_GOOGLE_CLIENT_ID` in the frontend build environment. Add the exact static-site origin (including `https://streaks-p6f7.onrender.com`) to the comma-separated `CORS_ORIGIN` allow-list. Migration `006_google_auth.sql` adds Google identity support while preserving existing password accounts. Use a persistent PostgreSQL plan appropriate for the expected retention; this repository does not assume a particular pricing tier. No deployment or database resource is created by this phase.
