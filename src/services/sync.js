@@ -134,7 +134,6 @@ export function validateCloudSnapshot(snapshot) {
   }
 
   if (!["en", "ar"].includes(snapshot.preferences.language) ||
-      typeof snapshot.preferences.remindersEnabled !== "boolean" ||
       (snapshot.preferences.timezone !== null && !isValidTimezone(snapshot.preferences.timezone)) ||
       (snapshot.preferences.updatedAt !== null && !Number.isFinite(Date.parse(snapshot.preferences.updatedAt)))) {
     throw new Error("syncInvalid");
@@ -269,7 +268,7 @@ export function captureSyncMutations(previousRaw, nextRaw) {
         account.pending.completionDeletes[id] = deletes;
       }
 
-      if (before && (before.language !== after.language || before.reminders?.enabled !== after.reminders?.enabled)) {
+      if (before && before.language !== after.language) {
         account.pending.preferencesChangedAt = now;
       }
     }
@@ -655,34 +654,33 @@ export async function analyseSync(localData, rawLocal, snapshot, account, legacy
     setChallenge(nextChallenges, id, local);
   }
 
-  const localPrefs = { language: localData.language, remindersEnabled: localData.reminders?.enabled === true };
+  const localPrefs = { language: localData.language };
   const remotePrefs = snapshot.preferences;
   const basePrefs = account.preferencesBaseline;
 
   const localPrefsChanged = basePrefs
     ? !sameSyncValue(localPrefs, basePrefs.value) ||
       Boolean(pending.preferencesChangedAt && (!account.lastSyncedAt || pending.preferencesChangedAt > account.lastSyncedAt))
-    : !sameSyncValue(localPrefs, { language: remotePrefs.language, remindersEnabled: remotePrefs.remindersEnabled });
+    : !sameSyncValue(localPrefs, { language: remotePrefs.language });
 
   const cloudPrefsChanged = basePrefs
-    ? !sameSyncValue({ language: remotePrefs.language, remindersEnabled: remotePrefs.remindersEnabled }, basePrefs.value) ||
+    ? !sameSyncValue({ language: remotePrefs.language }, basePrefs.value) ||
       Boolean(remotePrefs.updatedAt && basePrefs.updatedAt && remotePrefs.updatedAt > basePrefs.updatedAt)
-    : !sameSyncValue(localPrefs, { language: remotePrefs.language, remindersEnabled: remotePrefs.remindersEnabled });
+    : !sameSyncValue(localPrefs, { language: remotePrefs.language });
 
   let selectedPrefs = localPrefs;
-  if (localPrefsChanged && cloudPrefsChanged && !sameSyncValue(localPrefs, { language: remotePrefs.language, remindersEnabled: remotePrefs.remindersEnabled })) {
+  if (localPrefsChanged && cloudPrefsChanged && !sameSyncValue(localPrefs, { language: remotePrefs.language })) {
     const localTime = Date.parse(pending.preferencesChangedAt || account.lastSyncedAt || 0);
     const cloudTime = Date.parse(remotePrefs.updatedAt || 0);
-    selectedPrefs = localTime > cloudTime ? localPrefs : { language: remotePrefs.language, remindersEnabled: remotePrefs.remindersEnabled };
+    selectedPrefs = localTime > cloudTime ? localPrefs : { language: remotePrefs.language };
   } else if (cloudPrefsChanged && !localPrefsChanged) {
-    selectedPrefs = { language: remotePrefs.language, remindersEnabled: remotePrefs.remindersEnabled };
+    selectedPrefs = { language: remotePrefs.language };
   }
 
   const nextState = {
     version: 1,
     language: selectedPrefs.language,
-    challenges: nextChallenges,
-    reminders: { ...(localData.reminders || { enabled: false, lastReminderDate: "" }), enabled: selectedPrefs.remindersEnabled }
+    challenges: nextChallenges
   };
 
   const tombstoneChallengeSet = new Set(challengeTombstones.keys());
@@ -974,7 +972,6 @@ export async function runCloudSync({
   const cloudPrefs = plan.snapshot.preferences;
   const preferencePatch = {};
   if (desiredPrefs.language !== cloudPrefs.language) preferencePatch.language = desiredPrefs.language;
-  if (desiredPrefs.remindersEnabled !== cloudPrefs.remindersEnabled) preferencePatch.remindersEnabled = desiredPrefs.remindersEnabled;
 
   if (Object.keys(preferencePatch).length) {
     cloudWriteStarted = true;

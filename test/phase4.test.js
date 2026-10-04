@@ -176,7 +176,7 @@ test("Phase 4 - StreaksContext Logic & Initial Load Safety", async () => {
   assert.equal(loaded.state.challenges.length, 1);
   assert.equal(loaded.state.challenges[0].name, "Morning Running");
   assert.equal(loaded.state.language, "ar");
-  assert.equal(loaded.state.reminders.enabled, true);
+  assert.equal(Object.hasOwn(loaded.state, "reminders"), false);
 
   // Test mutation persist
   const nextChallenges = [
@@ -193,6 +193,7 @@ test("Phase 4 - StreaksContext Logic & Initial Load Safety", async () => {
   const nextState = { ...loaded.state, challenges: nextChallenges };
   const saved = persist(nextState, rawBefore);
   assert.deepEqual(saved, { ok: true, error: null });
+  assert.equal(Object.hasOwn(JSON.parse(localStorage.getItem(STORAGE_KEY)), "reminders"), false);
 
   const updatedLoaded = load();
   assert.equal(updatedLoaded.state.challenges.length, 2);
@@ -295,7 +296,7 @@ test("Phase 4 - Navigation History API Synchronization", () => {
 
 test("Phase 4 - Toast State and Live Region Attributes", () => {
   // Verify live region attribute rules:
-  // Normal notification toast: role="status", aria-live="polite"
+  // Normal toast status: role="status", aria-live="polite"
   // Alert/danger error toast: role="alert", aria-live="assertive"
   const normalToast = { id: 1, message: "Saved note", type: "status" };
   const alertToast = { id: 2, message: "Session expired", type: "alert" };

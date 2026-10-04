@@ -29,7 +29,6 @@ import {
   validTimestamp,
   validChallenge,
   validImportChallenge,
-  normalizeReminders,
   load,
   persist,
   saveRawBackup,
@@ -168,7 +167,6 @@ const vanillaFn = new Function(`
     validTimestamp,
     validChallenge,
     validImportChallenge,
-    normalizeReminders,
     sameSyncValue,
     cloudFields,
     localSyncFields,
@@ -184,10 +182,10 @@ test("1. i18n Translation Dictionary Equivalence", () => {
   const vanillaEnKeys = Object.keys(vanilla.i18n.en);
   const vanillaArKeys = Object.keys(vanilla.i18n.ar);
 
-  assert.equal(enKeys.length, 235, "English key count must include timezone, chart, landing, auth, Google, and sync labels");
-  assert.equal(arKeys.length, 235, "Arabic key count must include timezone, chart, landing, auth, Google, and sync labels");
-  assert.equal(vanillaEnKeys.length, 183);
-  assert.equal(vanillaArKeys.length, 183);
+  assert.equal(enKeys.length, 225, "English key count must include timezone, chart, landing, auth, Google, and sync labels");
+  assert.equal(arKeys.length, 225, "Arabic key count must include timezone, chart, landing, auth, Google, and sync labels");
+  assert.equal(vanillaEnKeys.length, 173);
+  assert.equal(vanillaArKeys.length, 173);
 
   for (const k of vanillaEnKeys) {
     assert.equal(en[k], vanilla.i18n.en[k], `Mismatch in EN key ${k}`);
@@ -338,7 +336,8 @@ test("4. Storage Service - Validation, Schema Safety, and Persistence", () => {
   assert.equal(loaded.state.language, "ar");
   assert.equal(loaded.state.challenges.length, 1);
   assert.equal(loaded.state.challenges[0].name, "Exercise Daily");
-  assert.equal(loaded.state.reminders.enabled, true);
+  assert.equal(Object.hasOwn(loaded.state, "reminders"), false);
+  assert.equal(Object.hasOwn(JSON.parse(localStorage.getItem(STORAGE_KEY)), "reminders"), false);
 });
 
 test("Storage recovery preserves corrupt JSON and rejects unsupported newer versions", () => {
@@ -372,6 +371,7 @@ test("Version 0 data is backed up before migration to version 1", () => {
   assert.equal(result.ok, true);
   assert.equal(result.state.version, VERSION);
   assert.equal(result.state.language, "ar");
+  assert.equal(Object.hasOwn(JSON.parse(localStorage.getItem(STORAGE_KEY)), "reminders"), false);
   assert.ok(localStorage.getItem(`${BACKUP_PREFIX}${Date.now()}`) === legacy ||
     [...localStorage.store.keys()].some((key) => key.startsWith(BACKUP_PREFIX) && localStorage.getItem(key) === legacy));
   assert.equal(JSON.parse(localStorage.getItem(STORAGE_KEY)).version, VERSION);
@@ -479,13 +479,14 @@ test("mutate retries from a changed revision and reapplies the operation", async
     if (calls === 1) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, language: "ar" }));
     }
-    return { state: { ...current, reminders: { ...current.reminders, enabled: true } } };
+    return { state: { ...current, language: "ar" } };
   });
 
   assert.equal(result.ok, true);
   assert.equal(calls, 2);
   assert.equal(result.state.language, "ar");
-  assert.equal(result.state.reminders.enabled, true);
+  assert.equal(Object.hasOwn(result.state, "reminders"), false);
+  assert.equal(Object.hasOwn(JSON.parse(localStorage.getItem(STORAGE_KEY)), "reminders"), false);
 });
 
 test("mutate enters recovery on corrupt or unsupported cross-tab data without overwriting it", async () => {
@@ -509,7 +510,7 @@ test("revision retries do not create backups for valid stored data", async () =>
     if (calls === 1) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, language: "ar" }));
     }
-    return { state: { ...current, reminders: { ...current.reminders, enabled: true } } };
+    return { state: { ...current, language: "ar" } };
   });
   assert.equal(result.ok, true);
   assert.equal([...localStorage.store.keys()].filter((key) => key.startsWith(BACKUP_PREFIX)).length, 0);
@@ -771,7 +772,6 @@ test("Starting with an empty cloud account preserves and marks existing local re
   const local = {
     source: {
       language: "ar",
-      reminders: { enabled: true },
       challenges: [{ id: "local-1" }, { id: "local-2" }]
     }
   };
@@ -782,8 +782,7 @@ test("Starting with an empty cloud account preserves and marks existing local re
   assert.equal(account.initialSyncHandled, "empty");
   assert.deepEqual(account.localOnlyIds, ["local-1", "local-2"]);
   assert.deepEqual(account.preferencesBaseline.value, {
-    language: "ar",
-    remindersEnabled: true
+    language: "ar"
   });
   assert.equal(account.pending.preferencesChangedAt, null);
 });
@@ -867,12 +866,12 @@ test("Only user mutations publish sync triggers; sync-applied state does not", a
   });
   localStorage.clear();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(createInitialState()));
-  let notifications = 0;
-  const unsubscribe = subscribeLocalMutations(() => { notifications++; });
+  let mutationEvents = 0;
+  const unsubscribe = subscribeLocalMutations(() => { mutationEvents++; });
   try {
     const mutation = await mutateState((current) => ({ ...current, language: "ar" }));
     assert.equal(mutation.ok, true);
-    assert.equal(notifications, 1);
+    assert.equal(mutationEvents, 1);
 
     const expectedRaw = localStorage.getItem(STORAGE_KEY);
     const syncCommit = await commitIfUnchanged(expectedRaw, {
@@ -880,7 +879,7 @@ test("Only user mutations publish sync triggers; sync-applied state does not", a
       language: "en"
     });
     assert.equal(syncCommit.ok, true);
-    assert.equal(notifications, 1);
+    assert.equal(mutationEvents, 1);
     assert.equal(LOCAL_MUTATION_EVENT, "streaks:local-mutation");
   } finally {
     unsubscribe();
@@ -979,7 +978,7 @@ test("6. Cloud Sync - Snapshot Validation and 3-Way Merge", async () => {
       }
     ],
     tombstones: [],
-    preferences: { language: "en", remindersEnabled: false, timezone: null, updatedAt: null },
+    preferences: { language: "en", timezone: null, updatedAt: null },
     time: {
       today: "2026-10-03",
       serverNow: "2026-10-03T12:00:00.000Z",
@@ -1091,7 +1090,7 @@ test("6. Cloud Sync - Snapshot Validation and 3-Way Merge", async () => {
       }
     ],
     tombstones: [],
-    preferences: { language: "en", remindersEnabled: false, updatedAt: null }
+    preferences: { language: "en", updatedAt: null }
   };
 
   const conflictPlan = await analyseSync(conflictLocal, JSON.stringify(conflictLocal), snapshotWithCloudEdit, accountWithBaseline, null, {});
@@ -1197,7 +1196,7 @@ test("7. Cloud Backup Source Reader", () => {
         note: "Great run"
       }
     ],
-    reminders: { enabled: true, lastReminderDate: "2026-10-03" }
+    reminders: "legacy-invalid"
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleLocal));
 

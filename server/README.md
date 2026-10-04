@@ -92,12 +92,12 @@ There is at most one note per challenge. Content is limited to 1,000 characters 
 
 ### Preferences
 
-`language` (`en` or `ar`), `remindersEnabled` (boolean), and `timezone` (a valid IANA name or `null`) are accepted. The time zone is stored on the user row; the GET route creates the default preferences row if it is missing. Both routes return the current server `time` object.
+`language` (`en` or `ar`) and `timezone` (a valid IANA name or `null`) are accepted. The time zone is stored on the user row; the GET route creates the default preferences row if it is missing. Both routes return the current server `time` object.
 
 | Method and path | Request | Success | Common errors |
 | --- | --- | --- | --- |
-| `GET /api/preferences` | — | `200 {"preferences":{"language":"en","remindersEnabled":false,"timezone":null},"time":{…}}` | `401` |
-| `PATCH /api/preferences` | `{ "timezone":"Africa/Khartoum" }`, language, reminders, or combinations | `200 {"preferences":{"language":"en","remindersEnabled":false,"timezone":"Africa/Khartoum"},"time":{…}}` | `400` invalid/unknown fields, `401` |
+| `GET /api/preferences` | — | `200 {"preferences":{"language":"en","timezone":null},"time":{…}}` | `401` |
+| `PATCH /api/preferences` | `{ "timezone":"Africa/Khartoum" }`, language, or both | `200 {"preferences":{"language":"en","timezone":"Africa/Khartoum"},"time":{…}}` | `400` invalid/unknown fields, `401` |
 
 `GET /api/sync` also includes `preferences.timezone` and the same `time` object, so clients can use one server-authoritative date for validation and display.
 
@@ -107,7 +107,7 @@ The frontend API base URL is configured once using the `streaks-api-base-url` me
 
 Authentication rate limits are 20 failed login attempts per IP per 15 minutes (successful logins do not count) and 5 registration attempts per IP per hour. The API sets Express `trust proxy` to `1` for Render's single reverse-proxy hop; keep this aligned with the production proxy topology.
 
-The one-way **Back up to Cloud** action includes supported local challenge fields, completion dates, notes, language, and reminders enabled. Local challenge IDs/created timestamps and reminder last-fire dates have no equivalent cloud field and remain local. It validates the raw local dataset, shows counts before confirmation, scopes retry metadata to the authenticated account in a separate browser-storage key, and reports partial failures. Challenges use server-enforced per-user `migrationKey` values; duplicate completions return `409` and are treated by the client as already present. Notes and preferences use the existing upsert/patch behavior. The local dataset is never deleted or replaced.
+The one-way **Back up to Cloud** action includes supported local challenge fields, completion dates, notes, and language. It validates the raw local dataset, shows counts before confirmation, scopes retry metadata to the authenticated account in a separate browser-storage key, and reports partial failures. Challenges use server-enforced per-user `migrationKey` values; duplicate completions return `409` and are treated by the client as already present. Notes and preferences use the existing upsert/patch behavior. The local dataset is never deleted or replaced.
 
 Cloud synchronization is available from the account panel. The server remains authoritative for the account time zone; the client's detected zone is submitted before the first sync when no server value exists.
 

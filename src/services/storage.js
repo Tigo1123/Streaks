@@ -68,32 +68,15 @@ export function validImportChallenge(c) {
 }
 
 /**
- * Normalizes reminders object to prevent malformed properties.
- *
- * @param {any} value
- * @returns {{ enabled: boolean, lastReminderDate: string }}
- */
-export function normalizeReminders(value) {
-  return {
-    enabled: value?.enabled === true,
-    lastReminderDate:
-      typeof value?.lastReminderDate === "string" && /^\d{4}-\d\d-\d\d$/.test(value.lastReminderDate)
-        ? value.lastReminderDate
-        : ""
-  };
-}
-
-/**
  * Returns default initial state.
  *
- * @returns {{ version: number, language: "en" | "ar", challenges: any[], reminders: { enabled: boolean, lastReminderDate: string } }}
+ * @returns {{ version: number, language: "en" | "ar", challenges: any[] }}
  */
 export function createInitialState() {
   return {
     version: VERSION,
     language: "en",
-    challenges: [],
-    reminders: { enabled: false, lastReminderDate: "" }
+    challenges: []
   };
 }
 
@@ -112,6 +95,14 @@ function backupKeys() {
       const right = b.slice(BACKUP_PREFIX.length).split("-").map(Number);
       return (left[0] - right[0]) || ((left[1] || 0) - (right[1] || 0));
     });
+}
+
+function cleanStoredState(state) {
+  const cleaned = { ...state };
+  delete cleaned.reminders;
+  delete cleaned.remindersEnabled;
+  delete cleaned.lastReminderDate;
+  return cleaned;
 }
 
 /**
@@ -225,7 +216,7 @@ function readStoredValue(raw, { createBackups = true, persistMigrations = true }
         if (localStorage.getItem(STORAGE_KEY) !== raw) {
           return readStoredValue(localStorage.getItem(STORAGE_KEY), { createBackups: false, persistMigrations: false });
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanStoredState(migrated)));
       } catch (error) {
         return { ok: false, state: createInitialState(), raw, error: { code: "migration-write-failed", cause: error }, quarantinedCount: 0 };
       }
@@ -248,8 +239,7 @@ function readStoredValue(raw, { createBackups = true, persistMigrations = true }
   const state = {
     version: VERSION,
     language: migrated.language === "ar" ? "ar" : "en",
-    challenges,
-    reminders: normalizeReminders(migrated.reminders)
+    challenges
   };
 
   return { ok: true, state, raw, error: null, quarantinedCount };
@@ -362,7 +352,8 @@ export async function commitIfUnchanged(expectedRaw, state) {
 export function persist(state, previousRaw = null) {
   try {
     const previous = previousRaw !== null ? previousRaw : localStorage.getItem(STORAGE_KEY);
-    const next = JSON.stringify(state);
+    const cleanedState = cleanStoredState(state);
+    const next = JSON.stringify(cleanedState);
     localStorage.setItem(STORAGE_KEY, next);
 
     if (!isApplyingSyncState()) {

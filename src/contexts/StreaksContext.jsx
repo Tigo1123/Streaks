@@ -1,5 +1,5 @@
 import React, { createContext, useState, useCallback, useRef, useEffect } from "react";
-import { load, mutateState, replaceWithInitialState, validImportChallenge, normalizeReminders, VERSION } from "../services/storage.js";
+import { load, mutateState, replaceWithInitialState, validImportChallenge, VERSION } from "../services/storage.js";
 import { migrationUuid } from "../services/sync.js";
 import { progress } from "../utils/streakCalculations.js";
 import { validDate } from "../utils/date.js";
@@ -169,18 +169,6 @@ export function StreaksProvider({ children }) {
     return runMutation((current) => ({ state: { ...current, language: normalized } }));
   }, [runMutation]);
 
-  const setRemindersEnabled = useCallback((enabled) => {
-    return runMutation((current) => ({
-      state: { ...current, reminders: { ...current.reminders, enabled: Boolean(enabled) } }
-    }));
-  }, [runMutation]);
-
-  const setLastReminderDate = useCallback((dateStr) => {
-    return runMutation((current) => ({
-      state: { ...current, reminders: { ...current.reminders, lastReminderDate: dateStr } }
-    }));
-  }, [runMutation]);
-
   const importData = useCallback(async (data) => {
     const ids = new Set();
     if (
@@ -201,8 +189,7 @@ export function StreaksProvider({ children }) {
       state: {
         version: VERSION,
         language: data.language,
-        challenges: data.challenges,
-        reminders: normalizeReminders(current.reminders)
+        challenges: data.challenges
       }
     }));
     if (!saved.ok) return saved;
@@ -249,7 +236,6 @@ export function StreaksProvider({ children }) {
   const value = {
     challenges: state.challenges,
     language: state.language,
-    reminders: state.reminders,
     loadError: loadResult.ok ? null : loadResult.error,
     rawStorageData: loadResult.raw,
     quarantinedCount: loadResult.quarantinedCount,
@@ -262,8 +248,6 @@ export function StreaksProvider({ children }) {
     saveNote,
     deleteNote,
     setLanguage,
-    setRemindersEnabled,
-    setLastReminderDate,
     importData,
     exportData,
     reloadFromStorage

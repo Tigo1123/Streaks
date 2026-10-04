@@ -16,10 +16,7 @@ export function markLocalChallengesOnly(account, local, snapshot) {
   account.initialSyncHandled = "empty";
   account.localOnlyIds = local.source.challenges.map((challenge) => challenge.id);
   account.preferencesBaseline = {
-    value: {
-      language: local.source.language,
-      remindersEnabled: local.source.reminders?.enabled === true
-    },
+    value: { language: local.source.language },
     updatedAt: snapshot.preferences.updatedAt
   };
   account.pending.preferencesChangedAt = null;

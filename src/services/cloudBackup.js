@@ -21,7 +21,7 @@ export function readMigrationSource(today = localToday()) {
   if (raw === null) {
     return {
       raw,
-      source: { version: VERSION, language: "en", challenges: [], reminders: { enabled: false } },
+      source: { version: VERSION, language: "en", challenges: [] },
       counts: { challenges: 0, completions: 0, notes: 0 }
     };
   }
@@ -42,11 +42,6 @@ export function readMigrationSource(today = localToday()) {
   }
 
   if (data.language !== "en" && data.language !== "ar") {
-    bad("cloudNoData");
-  }
-
-  const reminders = data.reminders === undefined ? { enabled: false } : data.reminders;
-  if (!reminders || typeof reminders !== "object" || Array.isArray(reminders) || (reminders.enabled !== undefined && typeof reminders.enabled !== "boolean")) {
     bad("cloudNoData");
   }
 
@@ -83,8 +78,7 @@ export function readMigrationSource(today = localToday()) {
     source: {
       version: VERSION,
       language: data.language,
-      challenges: data.challenges,
-      reminders: { enabled: reminders.enabled === true }
+      challenges: data.challenges
     },
     counts: { challenges: data.challenges.length, completions, notes }
   };
@@ -280,7 +274,7 @@ export async function migrateLocalData({ token, userId, onProgress, today = loca
     const prefs = await authRequest("/api/preferences", {
       method: "PATCH",
       token,
-      body: { language: source.language, remindersEnabled: source.reminders.enabled }
+      body: { language: source.language }
     });
     if (!prefs.response.ok) {
       throw Object.assign(new Error("api"), { status: prefs.response.status, preferenceFailure: true });

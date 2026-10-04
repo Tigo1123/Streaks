@@ -309,21 +309,21 @@ test("cloud data API integration and ownership (requires TEST_DATABASE_URL)", {
   await t.test("preferences return per-user defaults and accept only supported fields", async () => {
     let response = await request("/api/preferences", { token: tokenA });
     let payload = await response.json();
-    assert.deepEqual(payload.preferences, { language: "en", remindersEnabled: false, timezone: null });
+    assert.deepEqual(payload.preferences, { language: "en", timezone: null });
     assert.equal(typeof payload.time.serverNow, "string");
     assert.equal(typeof payload.time.nextMidnightAt, "string");
     response = await request("/api/preferences", {
-      method: "PATCH", token: tokenA, body: { language: "ar", remindersEnabled: true }
+      method: "PATCH", token: tokenA, body: { language: "ar" }
     });
     assert.equal(response.status, 200);
-    assert.deepEqual((await response.json()).preferences, { language: "ar", remindersEnabled: true, timezone: null });
+    assert.deepEqual((await response.json()).preferences, { language: "ar", timezone: null });
     payload = await (await request("/api/preferences", { token: tokenB })).json();
-    assert.deepEqual(payload.preferences, { language: "en", remindersEnabled: false, timezone: null });
+    assert.deepEqual(payload.preferences, { language: "en", timezone: null });
     assert.equal((await request("/api/preferences", {
       method: "PATCH", token: tokenA, body: { language: "fr" }
     })).status, 400);
     assert.equal((await request("/api/preferences", {
-      method: "PATCH", token: tokenA, body: { remindersEnabled: "true" }
+      method: "PATCH", token: tokenA, body: { remindersEnabled: true }
     })).status, 400);
     assert.equal((await request("/api/preferences", {
       method: "PATCH", token: tokenA, body: { timezone: "Not/A_Zone" }

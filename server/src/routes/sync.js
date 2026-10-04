@@ -29,7 +29,7 @@ router.get("/", async (req, res) => {
       [req.user.id]
     );
     const preferenceRows = await client.query(
-      `SELECT p.language, p.reminders_enabled, p.updated_at, u.timezone
+      `SELECT p.language, p.updated_at, u.timezone
        FROM preferences AS p JOIN users AS u ON u.id = p.user_id WHERE p.user_id = $1`,
       [req.user.id]
     );
@@ -51,7 +51,7 @@ router.get("/", async (req, res) => {
       notes: noteRows.rows.map((row) => ({ challengeId: row.challenge_id, note: mapNote(row) })),
       preferences: preferenceRows.rowCount
         ? { ...mapPreferences(preferenceRows.rows[0]), updatedAt: new Date(preferenceRows.rows[0].updated_at).toISOString() }
-        : { language: "en", remindersEnabled: false, timezone, updatedAt: null },
+        : { language: "en", timezone, updatedAt: null },
       time: timeContext(timezone),
       tombstones: tombstoneRows.rows.map((row) => ({
         entityType: row.entity_type,

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { useStreaks } from "../../hooks/useStreaks.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useSync } from "../../hooks/useSync.js";
-import { useReminders } from "../../hooks/useReminders.js";
 import { useNavigation } from "../../hooks/useNavigation.js";
 import { useToast } from "../../hooks/useToast.js";
 import { t } from "../../i18n/index.js";
@@ -16,7 +15,6 @@ export function TopNav({ onToggleSidebar }) {
     lastSyncedAt,
     startSync
   } = useSync();
-  const { isEnabled: remindersEnabled, enableReminders, disableReminders } = useReminders();
   const { currentScreen, openModal } = useNavigation();
   const { showToast } = useToast();
 
@@ -24,15 +22,6 @@ export function TopNav({ onToggleSidebar }) {
 
   const toggleLanguage = async () => {
     await setLanguage(language === "en" ? "ar" : "en");
-  };
-
-  const handleReminderToggle = async () => {
-    if (remindersEnabled) {
-      const result = await disableReminders();
-      if (result.ok) showToast(t("reminderOff", {}, language));
-    } else {
-      enableReminders();
-    }
   };
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -170,27 +159,6 @@ export function TopNav({ onToggleSidebar }) {
             </span>
           </>
         )}
-
-        {/* Reminders Toggle */}
-        <button
-          type="button"
-          className="btn-icon"
-          onClick={handleReminderToggle}
-          aria-pressed={remindersEnabled}
-          aria-label={`${t("reminders", {}, language)}: ${remindersEnabled ? t("reminderOn", {}, language) : t("reminderOff", {}, language)}`}
-          title={`${t("reminders", {}, language)}: ${remindersEnabled ? t("reminderOn", {}, language) : t("reminderOff", {}, language)}`}
-          style={{
-            height: "34px",
-            width: "34px",
-            color: remindersEnabled ? "var(--color-primary)" : "var(--text-muted)",
-            borderColor: remindersEnabled ? "var(--color-primary)" : undefined,
-            backgroundColor: remindersEnabled ? "var(--color-primary-subtle)" : undefined
-          }}
-        >
-          <span aria-hidden="true" style={{ fontSize: "0.9rem" }}>
-            {remindersEnabled ? "🔔" : "🔕"}
-          </span>
-        </button>
 
         {/* Language Switcher Pill */}
         <button

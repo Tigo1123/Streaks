@@ -68,7 +68,6 @@ function mapNote(row) {
 function mapPreferences(row) {
   return {
     language: row.language,
-    remindersEnabled: row.reminders_enabled,
     timezone: row.timezone ?? null
   };
 }
