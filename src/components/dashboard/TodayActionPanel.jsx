@@ -6,6 +6,7 @@ import { progress, streakStats } from "../../utils/streakCalculations.js";
 import { ProgressRing } from "../common/ProgressRing.jsx";
 import { t } from "../../i18n/index.js";
 import { useTimezone } from "../../hooks/useTimezone.js";
+import { LineIcon } from "../common/LineIcon.jsx";
 
 export function TodayActionPanel() {
   const { challenges, toggleCompletion, language } = useStreaks();
@@ -56,7 +57,7 @@ export function TodayActionPanel() {
       {/* Section Header */}
       <div className="today-panel-header">
         <div className="today-title-cluster">
-          <div className="today-bolt-avatar" aria-hidden="true">⚡</div>
+          <div className="today-bolt-avatar"><LineIcon name="bolt" size={21} /></div>
           <div>
             <h2 id="todayPanelTitle" className="today-panel-heading">
               {isRtl ? "مهام اليوم" : "Today's Focus"}

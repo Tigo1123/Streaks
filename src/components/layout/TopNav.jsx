@@ -5,6 +5,7 @@ import { useSync } from "../../hooks/useSync.js";
 import { useNavigation } from "../../hooks/useNavigation.js";
 import { useToast } from "../../hooks/useToast.js";
 import { t } from "../../i18n/index.js";
+import { LineIcon } from "../common/LineIcon.jsx";
 
 export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
   const { language, setLanguage, localDisplayName } = useStreaks();
@@ -104,14 +105,14 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
   const syncLabel = `${syncStatusLabel} · ${syncLastLabel}`;
   const displayName = isAuthenticated ? user?.displayName || "" : localDisplayName;
   const accountLabel = displayName || t("authAccount", {}, language);
-  const accountInitial = displayName ? Array.from(displayName.trim())[0]?.toLocaleUpperCase() : "👤";
+  const accountInitial = displayName ? Array.from(displayName.trim())[0]?.toLocaleUpperCase() : "•";
 
   return (
     <header className="topbar">
       <div className="topbar-left">
         <button
           type="button"
-          className="mobile-menu-btn"
+          className="mobile-menu-btn topbar-menu-btn"
           ref={menuButtonRef}
           onClick={onToggleSidebar}
           aria-label={t(isSidebarOpen ? "closeNavigationMenu" : "openNavigationMenu", {}, language)}
@@ -120,7 +121,7 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
         >
           ☰
         </button>
-        <span className="page-title">
+        <span className="page-title topbar-page-title">
           {currentScreen === "detail"
             ? (isRtl ? "تفاصيل التحدي" : "Challenge Tracker")
             : (isRtl ? "لوحة المتابعة" : "Daily Momentum")}
@@ -131,11 +132,12 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
         {/* New Challenge - Clean restrained action */}
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-primary topbar-create-btn"
           onClick={() => openModal("create")}
+          aria-label={t("newChallenge", {}, language)}
           style={{ height: "34px", padding: "0 12px", fontSize: "0.84rem" }}
         >
-          <span aria-hidden="true" style={{ fontWeight: 600 }}>＋</span>
+          <LineIcon name="plus" size={20} />
           <span className="topbar-btn-text">{t("newChallenge", {}, language)}</span>
         </button>
 
@@ -167,29 +169,6 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
           </>
         )}
 
-        {/* Language Switcher Pill */}
-        <button
-          type="button"
-          className="btn-icon"
-          onClick={() => openModal("timezone")}
-          aria-label={t("timezoneTitle", {}, language)}
-          title={t("timezoneTitle", {}, language)}
-          style={{ height: "34px", width: "34px" }}
-        >
-          <span aria-hidden="true">🌐</span>
-        </button>
-
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={toggleLanguage}
-          aria-label={t("languageLabel", {}, language)}
-          title={t("languageLabel", {}, language)}
-          style={{ height: "34px", padding: "0 10px", fontSize: "0.78rem", fontWeight: 600 }}
-        >
-          {language === "en" ? "العربية" : "English"}
-        </button>
-
         {/* Account Button & Clean Account Menu */}
         <div className="account-nav-wrapper" ref={accountMenuRef}>
           <button
@@ -201,7 +180,9 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
             aria-label={`${t("authAccount", {}, language)}: ${accountLabel}`}
             title={accountLabel}
           >
-            <span aria-hidden="true" className="account-nav-initial">{accountInitial}</span>
+            <span aria-hidden="true" className="account-nav-initial">
+              {displayName ? accountInitial : <LineIcon name="user" size={21} />}
+            </span>
             <span className="account-nav-btn-text">
               {accountLabel}
             </span>
@@ -226,8 +207,33 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
                 role="menuitem"
                 onClick={handleOpenSettings}
               >
-                <span aria-hidden="true">⚙️</span>
+                <span aria-hidden="true">⚙</span>
                 <span>{t("settingsTitle", {}, language)}</span>
+              </button>
+              <button
+                type="button"
+                className="account-dropdown-item"
+                role="menuitem"
+                onClick={() => {
+                  setIsAccountMenuOpen(false);
+                  openModal("timezone");
+                }}
+              >
+                <LineIcon name="globe" />
+                <span>{t("timezoneTitle", {}, language)}</span>
+              </button>
+              <button
+                type="button"
+                className="account-dropdown-item"
+                role="menuitem"
+                onClick={() => {
+                  setIsAccountMenuOpen(false);
+                  toggleLanguage();
+                }}
+              >
+                <span aria-hidden="true" className="account-menu-language-mark">文</span>
+                <span>{t("languageLabel", {}, language)}</span>
+                <span className="account-menu-language-value">{language === "en" ? "العربية" : "English"}</span>
               </button>
               {isAuthenticated ? (
                 <>
@@ -237,7 +243,7 @@ export function TopNav({ onToggleSidebar, isSidebarOpen, menuButtonRef }) {
                     role="menuitem"
                     onClick={handleOpenAccountModal}
                   >
-                    <span aria-hidden="true">☁️</span>
+                    <span aria-hidden="true">☁</span>
                     <span>{t("settingsAccountSync", {}, language)}</span>
                   </button>
                   <button

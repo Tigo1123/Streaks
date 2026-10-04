@@ -1,4 +1,4 @@
-const CACHE_NAME = "streaks-shell-v8";
+const CACHE_NAME = "streaks-shell-v9";
 const CACHE_PREFIX = "streaks-shell-";
 const scopeUrl = new URL(self.registration.scope);
 const indexUrl = new URL("index.html", scopeUrl);

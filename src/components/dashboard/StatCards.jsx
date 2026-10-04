@@ -7,6 +7,7 @@ import { useTimezone } from "../../hooks/useTimezone.js";
 import { ProgressRing } from "../common/ProgressRing.jsx";
 import { completionDistribution } from "../../utils/statistics.js";
 import { DistributionCard } from "./DistributionCard.jsx";
+import { LineIcon } from "../common/LineIcon.jsx";
 
 export function StatCards() {
   const { challenges, language } = useStreaks();
@@ -80,7 +81,7 @@ export function StatCards() {
             <ProgressRing
               value={todayPercent}
               label={isRtl ? "إنجاز اليوم" : "Today's completion"}
-              size={104}
+              size={116}
               className="progress-ring-hero"
             />
             <div className="pod-text-wrap">
@@ -90,7 +91,7 @@ export function StatCards() {
           </div>
 
           <div className="momentum-pod">
-            <div className="pod-badge-avatar">🎯</div>
+            <div className="pod-badge-avatar"><LineIcon name="target" /></div>
             <div className="pod-text-wrap">
               <span className="pod-value">{activeCount}</span>
               <span className="pod-label">{isRtl ? "تحديات نشطة" : "Active"}</span>
@@ -98,7 +99,7 @@ export function StatCards() {
           </div>
 
           <div className="momentum-pod">
-            <div className="pod-badge-avatar">📈</div>
+            <div className="pod-badge-avatar"><LineIcon name="chart" /></div>
             <div className="pod-text-wrap">
               <span className="pod-value">{completionRate}%</span>
               <span className="pod-label">{isRtl ? "معدل الالتزام" : "Consistency"}</span>

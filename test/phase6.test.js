@@ -78,3 +78,21 @@ test("profile presentation does not expose email in the header or greeting", () 
   assert.ok(settings.includes("user.email"));
   assert.ok(authModal.includes("authNameOptional"));
 });
+
+test("mobile shell keeps core navigation visible and provides inline vector icons", () => {
+  const projectRoot = path.resolve(import.meta.dirname, "..");
+  const topNav = fs.readFileSync(path.join(projectRoot, "src/components/layout/TopNav.jsx"), "utf8");
+  const layoutCss = fs.readFileSync(path.join(projectRoot, "src/styles/layout.css"), "utf8");
+  const componentsCss = fs.readFileSync(path.join(projectRoot, "src/styles/components.css"), "utf8");
+  const statCards = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/StatCards.jsx"), "utf8");
+  const todayPanel = fs.readFileSync(path.join(projectRoot, "src/components/dashboard/TodayActionPanel.jsx"), "utf8");
+
+  assert.ok(layoutCss.includes('grid-template-areas: "menu title account"'));
+  assert.ok(layoutCss.includes(".topbar-create-btn"));
+  assert.ok(layoutCss.includes("inset-inline-end: 16px"));
+  assert.ok(componentsCss.includes("border-block-start: 1px solid var(--border-subtle)"));
+  assert.ok(statCards.includes('<LineIcon name="target" />'));
+  assert.ok(statCards.includes('<LineIcon name="chart" />'));
+  assert.ok(todayPanel.includes('<LineIcon name="bolt"'));
+  assert.equal(topNav.includes("🌐"), false);
+});
