@@ -1,5 +1,6 @@
 import { validDate, dayIndex } from "../utils/date.js";
 import { captureSyncMutations } from "./sync.js";
+import { publishLocalMutation } from "./localMutationEvents.js";
 
 export const STORAGE_KEY = "streaks-data";
 export const BACKUP_PREFIX = `${STORAGE_KEY}-backup-`;
@@ -313,6 +314,7 @@ export async function mutateState(updater, maxRetries = 3) {
 
         const result = persist(nextState, loaded.raw);
         if (!result.ok) return { ...result, state: loaded.state, raw: loaded.raw };
+        publishLocalMutation();
         return {
           ...result,
           state: nextState,

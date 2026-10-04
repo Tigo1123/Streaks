@@ -10,7 +10,12 @@ import { t } from "../../i18n/index.js";
 export function TopNav({ onToggleSidebar }) {
   const { language, setLanguage } = useStreaks();
   const { user, isAuthenticated, logout } = useAuth();
-  const { status: syncStatus, isRunning: isSyncRunning, startSync } = useSync();
+  const {
+    status: syncStatus,
+    isRunning: isSyncRunning,
+    lastSyncedAt,
+    startSync
+  } = useSync();
   const { isEnabled: remindersEnabled, enableReminders, disableReminders } = useReminders();
   const { currentScreen, openModal } = useNavigation();
   const { showToast } = useToast();
@@ -84,13 +89,29 @@ export function TopNav({ onToggleSidebar }) {
     startSync();
   };
 
-  const syncLabel = isSyncRunning
-    ? t("syncing", {}, language)
+  const syncStatusKey = isSyncRunning
+    ? "syncStatusRunning"
     : syncStatus === "conflict"
-    ? t("syncConflictTitle", {}, language)
+    ? "syncStatusConflict"
+    : syncStatus === "choice"
+    ? "syncStatusChoice"
     : syncStatus === "offline"
-    ? t("syncOffline", {}, language)
-    : t("syncAction", {}, language);
+    ? "syncStatusOffline"
+    : ["error"].includes(syncStatus)
+    ? "syncStatusError"
+    : lastSyncedAt
+    ? "syncStatusSynced"
+    : "syncStatusNever";
+  const syncStatusLabel = t(syncStatusKey, {}, language);
+  const syncLastLabel = lastSyncedAt
+    ? t("syncLast", {
+      time: new Intl.DateTimeFormat(language === "ar" ? "ar" : "en", {
+        dateStyle: "short",
+        timeStyle: "short"
+      }).format(new Date(lastSyncedAt))
+    }, language)
+    : t("syncNever", {}, language);
+  const syncLabel = `${syncStatusLabel} · ${syncLastLabel}`;
 
   return (
     <header className="topbar">
@@ -124,24 +145,30 @@ export function TopNav({ onToggleSidebar }) {
 
         {/* Cloud Sync Status/Action */}
         {isAuthenticated && (
-          <button
-            type="button"
-            className="btn-icon"
-            onClick={handleSyncClick}
-            disabled={isSyncRunning}
-            aria-busy={isSyncRunning ? "true" : "false"}
-            aria-label={syncLabel}
-            title={syncLabel}
-            style={{
-              height: "34px",
-              width: "34px",
-              color: syncStatus === "conflict" ? "var(--color-danger)" : undefined
-            }}
-          >
-            <span aria-hidden="true" style={{ fontSize: "0.95rem" }}>
-              {isSyncRunning ? "⏳" : "☁️"}
+          <>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={handleSyncClick}
+              disabled={isSyncRunning}
+              aria-busy={isSyncRunning ? "true" : "false"}
+              aria-label={syncLabel}
+              title={syncLabel}
+              style={{
+                height: "34px",
+                width: "34px",
+                color: syncStatus === "conflict" ? "var(--color-danger)" : undefined
+              }}
+            >
+              <span aria-hidden="true" style={{ fontSize: "0.95rem" }}>
+                {isSyncRunning ? "⏳" : syncStatus === "conflict" ? "⚠️" : "☁️"}
+              </span>
+            </button>
+            <span className="sync-status-indicator" role="status" aria-live="polite">
+              <span>{syncStatusLabel}</span>
+              <small>{syncLastLabel}</small>
             </span>
-          </button>
+          </>
         )}
 
         {/* Reminders Toggle */}

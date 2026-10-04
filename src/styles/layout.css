@@ -230,6 +230,28 @@ html[dir="rtl"] .main-wrapper {
   flex-shrink: 0;
 }
 
+.sync-status-indicator {
+  display: flex;
+  flex-direction: column;
+  min-width: 76px;
+  max-width: 132px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.sync-status-indicator span,
+.sync-status-indicator small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-status-indicator small {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+
 /* Account Nav Menu Dropdown */
 .account-nav-wrapper {
   position: relative;
@@ -430,6 +452,15 @@ html[dir="rtl"] .account-dropdown-menu {
   }
 
   .topbar-btn-text {
+    display: none;
+  }
+
+  .sync-status-indicator {
+    min-width: 64px;
+    max-width: 86px;
+  }
+
+  .sync-status-indicator small {
     display: none;
   }
 

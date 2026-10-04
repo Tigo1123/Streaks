@@ -357,9 +357,20 @@ export async function analyseSync(localData, rawLocal, snapshot, account, legacy
 
   const pending = account.pending;
   const legacyChallenges = legacy?.challenges || {};
+  const localOnlyIds = new Set(account.localOnlyIds || []);
 
   for (const local of localData.challenges) {
     knownLocal.add(local.id);
+    if (localOnlyIds.has(local.id)) {
+      const changed =
+        pending.challengeChanges[local.id] ||
+        pending.noteChanges[local.id] ||
+        pending.challengeDeletes[local.id] ||
+        Object.keys(pending.completionAdds[local.id] || {}).length ||
+        Object.keys(pending.completionDeletes[local.id] || {}).length;
+      if (!changed) continue;
+      localOnlyIds.delete(local.id);
+    }
     let entry = account.challenges[local.id];
 
     if (!entry && legacyChallenges[local.id]) {
@@ -524,6 +535,7 @@ export async function analyseSync(localData, rawLocal, snapshot, account, legacy
     });
     setChallenge(nextChallenges, local.id, localNext);
   }
+  account.localOnlyIds = [...localOnlyIds].filter((id) => knownLocal.has(id));
 
   const wasMissing = rawLocal === null;
   for (const [localId, entry] of Object.entries(account.challenges)) {
@@ -556,7 +568,6 @@ export async function analyseSync(localData, rawLocal, snapshot, account, legacy
       handledCloud.add(remote.id);
       continue;
     }
-
     const baseline = entry.baseline;
     const deleteAt = pending.challengeDeletes?.[localId];
     const cloudNote = noteMap.get(remote.id)?.content ?? null;
@@ -771,7 +782,8 @@ export async function runCloudSync({
   decisions = {},
   signal,
   readMigrationSourceFn,
-  migrationStoreFn
+  migrationStoreFn,
+  beforeAnalyse
 }) {
   if (!token || !userId) throw new Error("Missing authentication credentials");
   if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -801,12 +813,31 @@ export async function runCloudSync({
   // 2. Read local state and cloud snapshot
   const local = readMigrationSourceFn ? readMigrationSourceFn() : { raw: localStorage.getItem(STORAGE_KEY), source: JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") };
   const store = readSyncMetadata();
+  const hadAccountMetadata = Object.hasOwn(store.accounts, userId);
   const account = ensureSyncAccount(store, userId);
   const legacy = migrationStoreFn ? migrationStoreFn().accounts[userId] || null : null;
 
   const response = await authRequest("/api/sync", { token, signal });
   if (!response.response.ok) throw syncApiError(response.response.status);
   validateCloudSnapshot(response.payload);
+
+  const bootstrap = await beforeAnalyse?.({
+    local,
+    snapshot: response.payload,
+    account,
+    store,
+    isFirstOnDevice: !hadAccountMetadata &&
+      !account.lastSyncedAt &&
+      Object.keys(account.challenges).length === 0 &&
+      !account.initialSyncHandled
+  });
+  if (bootstrap?.status === "choice-required") {
+    return {
+      status: "choice-required",
+      localCounts: local.source.challenges.length,
+      cloudCounts: response.payload.challenges.length
+    };
+  }
 
   // 3. Analyze and 3-way merge
   const plan = await analyseSync(local.source, local.raw, response.payload, account, legacy, decisions);

@@ -192,6 +192,20 @@ export const en = {
   "syncing": "Syncing…",
   "syncNever": "Not synced yet",
   "syncLast": "Last synced: {time}",
+  "syncStatusSynced": "Synced",
+  "syncStatusNever": "Not synced",
+  "syncStatusRunning": "Syncing",
+  "syncStatusOffline": "Offline",
+  "syncStatusError": "Sync issue",
+  "syncStatusConflict": "Needs conflict review",
+  "syncStatusChoice": "Choose initial sync",
+  "syncInitialMergeNotice": "Initial merge kept {localCount} local and {cloudCount} cloud challenges. Unlinked records were preserved; similar records may appear separately.",
+  "syncFirstChoiceTitle": "Choose how to start syncing",
+  "syncFirstChoiceIntro": "This device has {count} local challenges and the account has no cloud challenges yet.",
+  "syncFirstUpload": "Upload my local data",
+  "syncFirstEmpty": "Start with an empty account",
+  "syncFirstEmptyDetail": "Your current local data will be backed up and kept on this device only. New changes will sync.",
+  "syncBackupFailed": "A safety backup could not be saved. Nothing was synced; free device storage and retry.",
   "syncComplete": "Sync complete",
   "syncPartial": "Sync partially completed",
   "syncFailed": "Sync failed. Your local data is safe.",
@@ -219,7 +233,7 @@ export const en = {
   "syncResultLabel": "Cloud sync result",
   "syncProgress": "Preparing a safe sync…",
   "syncTombstoneRule": "Challenge deletions sync when you press Sync. Completion removals are retained as deletion markers.",
-  "syncAutomaticNote": "Sync is manual. Your local data remains available offline."
+  "syncAutomaticNote": "Changes sync automatically when you are online. Your local data remains available offline."
 };
 
 export default en;

@@ -192,6 +192,20 @@ export const ar = {
   "syncing": "جارٍ المزامنة…",
   "syncNever": "لم تتم المزامنة بعد",
   "syncLast": "آخر مزامنة: {time}",
+  "syncStatusSynced": "متزامن",
+  "syncStatusNever": "لم تتم المزامنة",
+  "syncStatusRunning": "جارٍ المزامنة",
+  "syncStatusOffline": "غير متصل",
+  "syncStatusError": "مشكلة في المزامنة",
+  "syncStatusConflict": "تعارض يحتاج إلى مراجعة",
+  "syncStatusChoice": "اختر إعداد المزامنة",
+  "syncInitialMergeNotice": "تم دمج {localCount} تحديات محلية و{cloudCount} سحابية في المزامنة الأولى. حُفظت السجلات غير المرتبطة وقد تظهر السجلات المتشابهة منفصلة.",
+  "syncFirstChoiceTitle": "اختر طريقة بدء المزامنة",
+  "syncFirstChoiceIntro": "يوجد على هذا الجهاز {count} تحديات محلية، ولا توجد تحديات في الحساب السحابي بعد.",
+  "syncFirstUpload": "ارفع بياناتي المحلية",
+  "syncFirstEmpty": "ابدأ بحساب فارغ",
+  "syncFirstEmptyDetail": "ستُحفظ نسخة من البيانات المحلية وتبقى على هذا الجهاز فقط. ستتم مزامنة التعديلات الجديدة.",
+  "syncBackupFailed": "تعذر حفظ نسخة أمان. لم تتم المزامنة؛ أفرغ مساحة على الجهاز ثم أعد المحاولة.",
   "syncComplete": "اكتملت المزامنة",
   "syncPartial": "اكتملت المزامنة جزئيًا",
   "syncFailed": "تعذرت المزامنة. بياناتك المحلية آمنة.",
@@ -209,7 +223,7 @@ export const ar = {
   "syncChallengeConflict": "تفاصيل التحدي مختلفة",
   "syncNoteConflict": "الملاحظة مختلفة",
   "syncLocalDeleted": "حُذف هذا التحدي من هذا الجهاز.",
-  "syncCloudDeleted": "حُذف هذا التحدي من السحابة.",
+  "syncCloudDeleted": "حُذف هذا التحدي في السحابة.",
   "syncDeleteLocal": "تأكيد الحذف",
   "syncNoChanges": "كل شيء محدّث.",
   "syncRetry": "إعادة المزامنة",
@@ -219,7 +233,7 @@ export const ar = {
   "syncResultLabel": "نتيجة المزامنة السحابية",
   "syncProgress": "جارٍ إعداد مزامنة آمنة…",
   "syncTombstoneRule": "تنتقل عمليات حذف التحديات عند اختيار المزامنة. وتُحفظ إزالة أيام الإنجاز كعلامات حذف.",
-  "syncAutomaticNote": "المزامنة يدوية، وتظل بياناتك المحلية متاحة دون اتصال."
+  "syncAutomaticNote": "تتزامن التعديلات تلقائيًا عند الاتصال، وتظل بياناتك المحلية متاحة دون اتصال."
 };
 
 export default ar;

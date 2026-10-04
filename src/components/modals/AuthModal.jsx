@@ -26,7 +26,12 @@ export function AuthModal() {
     clearErrors,
   } = useAuth();
 
-  const { status: syncStatus, isRunning: isSyncRunning, startSync } = useSync();
+  const {
+    status: syncStatus,
+    isRunning: isSyncRunning,
+    startSync,
+    initialMergeNotice
+  } = useSync();
   const { challenges, language } = useStreaks();
   const { modalMode, closeModal, openModal } = useNavigation();
   const { showToast } = useToast();
@@ -251,6 +256,11 @@ export function AuthModal() {
               </span>
             </div>
             <p className="cloud-card-desc">{t("syncAutomaticNote", {}, language)}</p>
+            {initialMergeNotice && (
+              <p className="cloud-card-note">
+                {t("syncInitialMergeNotice", initialMergeNotice, language)}
+              </p>
+            )}
             <button
               type="button"
               className="btn btn-primary cloud-action-btn"

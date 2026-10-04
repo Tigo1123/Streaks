@@ -61,13 +61,16 @@ An authenticated account can explicitly choose **Back up to Cloud** from its acc
 
 The upload is one-way and manual. It never clears or modifies `streaks-data`, replaces local IDs, loads cloud challenges into the app, or enables synchronization. A separate `streaks-cloud-migration-v1` localStorage key stores account-scoped retry metadata (migration keys, cloud ID mappings, and attempt/completion timestamps; no credentials). Stable server-enforced migration keys reuse the same cloud challenge on retries. Completion duplicates are treated as already uploaded, and notes/preferences are safely upserted. A failed or interrupted backup can be retried from the account panel; partial results are reported and local data remains intact.
 
-If there are no local challenges, Streaks reports that there is nothing to migrate and makes no cloud request. A backup completion means only that the explicit upload finished; it does not mean data is continuously synchronized. No automatic upload, cloud loading, conflict handling, or offline sync queue exists.
+If there are no local challenges, Streaks reports that there is nothing to migrate and makes no cloud request. A backup completion means only that the explicit upload finished; it does not mean data is continuously synchronized.
 
 ### Cloud synchronization (Phase 3C)
 
-Streaks includes manual two-way cloud synchronization for authenticated accounts:
+Streaks synchronizes data automatically for authenticated accounts and also keeps a manual sync action:
 
-- **Manual trigger:** Cloud sync is initiated on demand from the Account panel. It remains explicit, predictable, and fully operable offline.
+- **Automatic triggers:** Sync runs after sign-in, after local edits settle for seven seconds, when connectivity returns, and when a visible tab regains focus (at most once per minute). The manual sync action remains available.
+- **Quiet status and retries:** The navigation bar shows sync state and the last successful sync time. Network/server failures preserve local data and retry with backoff. Sync is serialized per account across tabs where Web Locks are available.
+- **First device/account setup:** If the cloud is empty but this device has challenges, choose whether to upload them or keep them local-only while starting the cloud account empty. The local-only choice first saves a rotating backup; those existing records stay on this device, while new records sync. If both locations already have data, a rotating backup is saved before the existing merge. With no local data, cloud data downloads directly.
+- **Initial merge limitation:** When a device has no prior cloud-ID mapping, the app cannot safely infer that similarly named local and cloud challenges are the same record. It preserves unlinked records, which may appear separately; later syncs use the saved mapping and 3-way baselines.
 - **Sync Model:**
   - Local-only challenge → uploaded to cloud.
   - Cloud-only challenge → downloaded to local device.

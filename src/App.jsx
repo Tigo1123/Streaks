@@ -7,6 +7,7 @@ import { DeleteChallengeModal } from "./components/modals/DeleteChallengeModal.j
 import { AuthModal } from "./components/modals/AuthModal.jsx";
 import { BackupModal } from "./components/modals/BackupModal.jsx";
 import { SyncConflictModal } from "./components/modals/SyncConflictModal.jsx";
+import { SyncOnboardingModal } from "./components/modals/SyncOnboardingModal.jsx";
 import { ImportExportModal } from "./components/modals/ImportExportModal.jsx";
 import { TimezoneModal } from "./components/modals/TimezoneModal.jsx";
 import { StorageRecoveryScreen } from "./components/common/StorageRecoveryScreen.jsx";
@@ -56,6 +57,7 @@ export function App() {
       <AuthModal />
       <BackupModal />
       <SyncConflictModal />
+      <SyncOnboardingModal />
       <ImportExportModal />
       <TimezoneModal />
     </>

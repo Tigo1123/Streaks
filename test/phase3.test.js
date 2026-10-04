@@ -50,6 +50,18 @@ import {
   validAuthUser
 } from "../src/services/authStorage.js";
 import { restoreAuthSession } from "../src/services/authSession.js";
+import { runCloudSync } from "../src/services/sync.js";
+import {
+  LOCAL_MUTATION_EVENT,
+  subscribeLocalMutations
+} from "../src/services/localMutationEvents.js";
+import {
+  classifyInitialSync,
+  createSyncTriggers,
+  markLocalChallengesOnly,
+  retryAfterAuthRefresh,
+  withSyncLock
+} from "../src/services/syncAutomation.js";
 import {
   completeGoogleLogin,
   GOOGLE_IDENTITY_SCRIPT_URL,
@@ -172,8 +184,8 @@ test("1. i18n Translation Dictionary Equivalence", () => {
   const vanillaEnKeys = Object.keys(vanilla.i18n.en);
   const vanillaArKeys = Object.keys(vanilla.i18n.ar);
 
-  assert.equal(enKeys.length, 221, "English key count must include timezone, chart, landing, auth, Google, and distribution labels");
-  assert.equal(arKeys.length, 221, "Arabic key count must include timezone, chart, landing, auth, Google, and distribution labels");
+  assert.equal(enKeys.length, 235, "English key count must include timezone, chart, landing, auth, Google, and sync labels");
+  assert.equal(arKeys.length, 235, "Arabic key count must include timezone, chart, landing, auth, Google, and sync labels");
   assert.equal(vanillaEnKeys.length, 183);
   assert.equal(vanillaArKeys.length, 183);
 
@@ -700,6 +712,186 @@ test("A server error during restore preserves the saved session", async () => {
   }));
   assert.equal(restored.kind, "unavailable");
   assert.deepEqual(readAuthSession(), saved);
+});
+
+test("Automatic sync debounce batches mutations and focus cadence is at least one minute", async () => {
+  const windowObject = new EventTarget();
+  const documentObject = new EventTarget();
+  documentObject.visibilityState = "visible";
+  const calls = [];
+  let mutationCallback;
+  let now = 100000;
+  const cleanup = createSyncTriggers({
+    startSync: (trigger) => calls.push(trigger),
+    windowObject,
+    documentObject,
+    subscribeMutations: (callback) => {
+      mutationCallback = callback;
+      return () => { mutationCallback = null; };
+    },
+    debounceMs: 20,
+    now: () => now
+  });
+
+  windowObject.dispatchEvent(new Event("focus"));
+  documentObject.dispatchEvent(new Event("visibilitychange"));
+  now += 59000;
+  windowObject.dispatchEvent(new Event("focus"));
+  now += 1000;
+  documentObject.dispatchEvent(new Event("visibilitychange"));
+  windowObject.dispatchEvent(new Event("online"));
+
+  mutationCallback();
+  mutationCallback();
+  await new Promise((resolve) => setTimeout(resolve, 35));
+  cleanup();
+  assert.deepEqual(calls, ["focus", "focus", "online", "mutation"]);
+  assert.equal(mutationCallback, null);
+});
+
+test("Initial sync classification distinguishes choice, merge, and download", () => {
+  assert.equal(classifyInitialSync({ localCount: 4, cloudCount: 0 }), "choose");
+  assert.equal(classifyInitialSync({ localCount: 4, cloudCount: 2 }), "merge");
+  assert.equal(classifyInitialSync({ localCount: 0, cloudCount: 2 }), "download");
+  assert.equal(classifyInitialSync({ localCount: 0, cloudCount: 0 }), "sync");
+  assert.equal(classifyInitialSync({ localCount: 4, cloudCount: 0, alreadyHandled: true }), "sync");
+});
+
+test("Starting with an empty cloud account preserves and marks existing local records only", () => {
+  const account = {
+    pending: {
+      preferencesChangedAt: "old-change",
+      challengeChanges: {},
+      noteChanges: {},
+      challengeDeletes: {},
+      completionAdds: {},
+      completionDeletes: {}
+    }
+  };
+  const local = {
+    source: {
+      language: "ar",
+      reminders: { enabled: true },
+      challenges: [{ id: "local-1" }, { id: "local-2" }]
+    }
+  };
+  const snapshot = {
+    preferences: { updatedAt: "2026-10-04T10:00:00.000Z" }
+  };
+  markLocalChallengesOnly(account, local, snapshot);
+  assert.equal(account.initialSyncHandled, "empty");
+  assert.deepEqual(account.localOnlyIds, ["local-1", "local-2"]);
+  assert.deepEqual(account.preferencesBaseline.value, {
+    language: "ar",
+    remindersEnabled: true
+  });
+  assert.equal(account.pending.preferencesChangedAt, null);
+});
+
+test("Sync Web Locks serialize overlapping tab requests", async () => {
+  let queue = Promise.resolve();
+  let active = 0;
+  let maximumActive = 0;
+  const lockManager = {
+    request(_name, _options, callback) {
+      const previous = queue;
+      let release;
+      queue = new Promise((resolve) => { release = resolve; });
+      return previous.then(async () => {
+        active++;
+        maximumActive = Math.max(maximumActive, active);
+        try {
+          await callback();
+        } finally {
+          active--;
+          release();
+        }
+      });
+    }
+  };
+  await Promise.all([
+    withSyncLock("account-1", async () => new Promise((resolve) => setTimeout(resolve, 15)), lockManager),
+    withSyncLock("account-1", async () => new Promise((resolve) => setTimeout(resolve, 15)), lockManager)
+  ]);
+  assert.equal(maximumActive, 1);
+});
+
+test("A sync 401 refreshes the session and retries exactly once", async () => {
+  let session = { token: "expired-token" };
+  let requests = 0;
+  const result = await retryAfterAuthRefresh(
+    async (token) => {
+      requests++;
+      if (token === "expired-token") throw Object.assign(new Error("unauthorized"), { status: 401 });
+      return { token };
+    },
+    async () => { session = { token: "refreshed-token" }; },
+    () => session,
+    session.token
+  );
+  assert.deepEqual(result, { token: "refreshed-token" });
+  assert.equal(requests, 2);
+});
+
+test("Sync failures leave local challenge data unchanged", async () => {
+  localStorage.clear();
+  const original = JSON.stringify(createInitialState());
+  localStorage.setItem(STORAGE_KEY, original);
+  const originalFetch = Object.getOwnPropertyDescriptor(globalThis, "fetch");
+  globalThis.fetch = async () => { throw new TypeError("offline"); };
+  try {
+    await assert.rejects(runCloudSync({
+      token: "access-token",
+      userId: "user-1",
+      readMigrationSourceFn: () => ({
+        raw: original,
+        source: JSON.parse(original),
+        counts: { challenges: 0, completions: 0, notes: 0 }
+      })
+    }), (error) => error.message === "syncOffline");
+    assert.equal(localStorage.getItem(STORAGE_KEY), original);
+  } finally {
+    if (originalFetch) Object.defineProperty(globalThis, "fetch", originalFetch);
+    else delete globalThis.fetch;
+  }
+});
+
+test("Only user mutations publish sync triggers; sync-applied state does not", async () => {
+  const previousWindow = globalThis.window;
+  const previousBroadcastChannel = Object.getOwnPropertyDescriptor(globalThis, "BroadcastChannel");
+  globalThis.window = new EventTarget();
+  Object.defineProperty(globalThis, "BroadcastChannel", {
+    value: undefined,
+    configurable: true,
+    writable: true
+  });
+  localStorage.clear();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(createInitialState()));
+  let notifications = 0;
+  const unsubscribe = subscribeLocalMutations(() => { notifications++; });
+  try {
+    const mutation = await mutateState((current) => ({ ...current, language: "ar" }));
+    assert.equal(mutation.ok, true);
+    assert.equal(notifications, 1);
+
+    const expectedRaw = localStorage.getItem(STORAGE_KEY);
+    const syncCommit = await commitIfUnchanged(expectedRaw, {
+      ...JSON.parse(expectedRaw),
+      language: "en"
+    });
+    assert.equal(syncCommit.ok, true);
+    assert.equal(notifications, 1);
+    assert.equal(LOCAL_MUTATION_EVENT, "streaks:local-mutation");
+  } finally {
+    unsubscribe();
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousBroadcastChannel) {
+      Object.defineProperty(globalThis, "BroadcastChannel", previousBroadcastChannel);
+    } else {
+      delete globalThis.BroadcastChannel;
+    }
+  }
 });
 
 test("Google sign-in stays hidden without a client ID or outside the login view", () => {
